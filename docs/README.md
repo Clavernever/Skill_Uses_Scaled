@@ -19,8 +19,6 @@
     > Reward big things too much and you'll end up with accidental powerleveling.  
     > Nerf small things too hard and you end up with neverleveling..  
     > ..or worse, with expensive things being the only option.  
-    > This would just be the previous situation reversed.  
-    > I'm not interested in working dozens of hours just to make a different flavour of the same problem.  
     - Toning down things that scale with themselves.
     > This goes back to the 1st section, but let's just say it's not surprising weapon skills increase fast.  
     > Not only do you use them a lot, but you also get more hits at higher skill levels, which results in more XP, which results in more levels...  
