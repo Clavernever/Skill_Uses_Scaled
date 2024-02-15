@@ -12,17 +12,17 @@
     Here's the fatcors I balanced around:
   
     - Making the spammage of ultracheap 'training' options an unoptimal choice.  
-    > 1 cost spells, 1 damage attacks, mudcrab struggle sessions.. you know the drill.  
+        > 1 cost spells, 1 damage attacks, mudcrab struggle sessions.. you know the drill.  
     - Making the use of expensive options a rewarding choice.  
-    > You shouldn't be punished for casting big spells, surviving big hits from scary enemies or dealing big damage, you should be rewarded for it.  
+        > You shouldn't be punished for casting big spells, surviving big hits from scary enemies or dealing big damage, you should be rewarded for it.  
     - Keeping overall skill progression around non-exploitey speeds.  
-    > Reward big things too much and you'll end up with accidental powerleveling.  
-    > Nerf small things too hard and you end up with neverleveling..  
-    > ..or worse, with expensive things being the only option.  
+        > Reward big things too much and you'll end up with accidental powerleveling.  
+        > Nerf small things too hard and you end up with neverleveling..  
+        > ..or worse, with expensive things being the only option.  
     - Toning down things that scale with themselves.
-    > This goes back to the 1st section, but let's just say it's not surprising weapon skills increase fast.  
-    > Not only do you use them a lot, but you also get more hits at higher skill levels, which results in more XP, which results in more levels...  
-    > Weapon XP requirements are basically a flat constant diguised as a linear slope.  
+        > This goes back to the 1st section, but let's just say it's not surprising weapon skills increase fast.  
+        > Not only do you use them a lot, but you also get more hits at higher skill levels, which results in more XP, which results in more levels...  
+        > Weapon XP requirements are basically a flat constant diguised as a linear slope.  
 
 - **Values in [brackets] indicate you can tweak them with a setting.**  
 
@@ -44,18 +44,18 @@
 
 - [ ] Weapon XP scales with Weapon Skill and net damage dealt (taken from item condition lost)  
     
-    `| XP Multiplier = Damage/[25] * 2 * [40]/([40] + Skill) |`
+    `  XP Multiplier = Damage/25 * 80 /(40 + Skill)  `
     
     - Weapon Skill is a divider.  
-    > This is to tone down the effect of hitting a lot more often.  
+        > This is to tone down the effect of hitting a lot more often.  
     - Condition Loss = NetDamage * \[fWeaponDamageMult->0.1\]  
-    > This means Strength factors directly into it, and so does enemy armor reduction.  
-    > As a result, XP will be mainly determined by _enemy HP_ rather than by how a$$ your weapon's minimal damage is.
+        > This means Strength factors directly into it, and so does enemy armor reduction.  
+        > As a result, XP will be mainly determined by _enemy HP_ rather than by how a$$ your weapon's minimal damage is.
 
 #### Magic
 - [ ] Magic XP scales with Max MP and MP spent.
 
-    `| XP Multiplier = Spellcost/[9] * 4.8 /(4 + xINT + FortifyMP/100) |`
+    `  XP Multiplier = Spellcost/9 *4.8 /(4 + xINT + FortifyMP/100)  `
 
     > Cast chance is not accounted for, and failing still gives zero XP. This is on purpose.  
     > It's what cheap spells are _actually_ meant for.
@@ -72,14 +72,15 @@
 
 - [ ] Alchemy XP scales Alchemy Skill and with the combined value and weight of all items consumed.
 
-    `| XP Multiplier = (Ingr.Value + 10 * Ingr.Weight + [20]) /[80] + 2*[40] /([40] + Skill) |`  
+   `  XP Multiplier = (Ingr.Value + 10*Ingr.Weight + 20) / 80 + 80/(40 + Skill)  `
 
     - Alchemy Skill is a divider.  
-    > This is to tone down the effect of getting more potions with the same amount of ingredients.      - Rewards spending expensive ingredients instead of selling them.
+        > This is to tone down the effect of getting more potions from any given amount of ingredients.
+    - Rewards spending expensive ingredients instead of selling them.
     - Rewards you for actually bothering to use heavy ingredients, which are more cumbersome to get and make more cumbersome potions.
     - Tones down XP from easily gathered/purchased ingredients.
     - More ingredients means more Value, means more XP. As it should.  
-    > Now you can make 4 ingredient superpotions and not feel wasteful for doing the objectively cool thing.
+        > Now you can make 4 ingredient superpotions and not feel wasteful for doing the objectively cool thing.
 
 ## UNTRACKABLE SKILLS
 > All of these skills scale with workaround or compromise variables.  
