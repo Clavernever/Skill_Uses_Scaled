@@ -64,10 +64,10 @@
 
 #### Alchemy
 
-- Alchemy XP scales with the combined value and weight of all items consumed.
-    - This rewards spending expensive ingredients instead of selling them.
-    - This tones down XP from easily gathered/purchased ingredients
-    - This rewards you for actually bothering to use heavy ingredients, which are more cumbersome to get and make more cumbersome potions.
+- [ ] Alchemy XP scales with the combined value and weight of all items consumed.
+    - Rewards spending expensive ingredients instead of selling them.
+    - Rewards you for actually bothering to use heavy ingredients, which are more cumbersome to get and make more cumbersome potions.
+    - Tones down XP from easily gathered/purchased ingredients
 
 ## UNTRACKABLE SKILLS
 > All of these skills scale with workaround or compromise variables.
