@@ -16,15 +16,15 @@
     - Making the use of expensive options a rewarding choice.  
     > You shouldn't be punished for casting big spells, surviving big hits from scary enemies or dealing big damage, you should be rewarded for it.  
     - Keeping overall skill progression around non-exploitey speeds.  
-    > Reward big things too much and you'll end up with accidental powerleveling.
+    > Reward big things too much and you'll end up with accidental powerleveling.  
     > Nerf small things too hard and you end up with neverleveling..  
-    > ..or worse, with expensive things being the only option.
-    > This would just be the previous situation reversed.
-    > I'm not interested in working dozens of hours just to make a different flavour of the same problem.
+    > ..or worse, with expensive things being the only option.  
+    > This would just be the previous situation reversed.  
+    > I'm not interested in working dozens of hours just to make a different flavour of the same problem.  
     - Toning down things that scale with themselves.
-    > This goes back to the 1st section, but let's just say it's not surprising weapon skills increase fast.
-    > Not only do you use them a lot, but you also get more hits at higher skill levels, which results in more XP, which results in more levels...
-    > Weapon XP requirements are basically a flat constant diguised as a linear slope.
+    > This goes back to the 1st section, but let's just say it's not surprising weapon skills increase fast.  
+    > Not only do you use them a lot, but you also get more hits at higher skill levels, which results in more XP, which results in more levels...  
+    > Weapon XP requirements are basically a flat constant diguised as a linear slope.  
 
 ## TRACKABLE SKILLS
 
@@ -70,8 +70,8 @@
     - Tones down XP from easily gathered/purchased ingredients
 
 ## UNTRACKABLE SKILLS
-> All of these skills scale with workaround or compromise variables.
-> The will get better scaling formulas as soon as Lua API support is added for the missing factors.
+> All of these skills scale with workaround or compromise variables.  
+> They will get better scaling formulas as soon as Lua API support is added for the missing factors.
 
 #### Throwing
 - [ ] Throwing XP scales with marksman level and average item damage.
