@@ -50,8 +50,8 @@
 
 #### Magic
 - [ ] Magic XP scales with Max MP and MP spent.
-    > Cast chance is not accounted for, and failing still gives zero XP.
-    > This is on purpose. It's what cheap spells are _actually_ meant for.
+    > Cast chance is not accounted for, and failing still gives zero XP. This is on purpose.  
+    > It's what cheap spells are _actually_ meant for.
     - Detailed formula ahead.
 
 #### Enchanting
