@@ -31,7 +31,7 @@
 
 #### Armor
 
-- [ ] Armor XP scales with Max HP, Base AR and amount of damage prevented (taken from item condition lost).
+- [ ] Armor XP scales with Max HP, Base AR and amount of damage prevented (taken from item condition lost).  
     On the base AR point specifically, the middle ground should be somewhere around 25 damage:  
     - Less than 25 damage favours low ARs.
     - More than 25 damage favours high ARs.  
