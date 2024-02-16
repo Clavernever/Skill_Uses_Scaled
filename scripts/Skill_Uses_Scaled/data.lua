@@ -1,4 +1,14 @@
-local skp   = require('openmw.interfaces').SkillProgression
+
+-- TOOLS
+local function makeIndexEnum(t)
+    local RESULT = {}
+    local i = 1
+    for _k, _ in pairs(t) do
+        RESULT[i] = _k
+        i = i + 1
+    end
+    return RESULT
+end
 
 local Data = {
 -- Player Data
@@ -12,26 +22,14 @@ local Data = {
         'mercantile' , 'mysticism', 'restoration', 'security'  , 'shortblade', 'sneak'     , 'spear'    , 'speechcraft', 'unarmored'
     },
     scaler_groups = {
-    SPELL = {'alteration', 'conjuration', 'destruction', 'illusion', 'mysticism', 'restoration'}
-    WEAPON = {'axe', 'bluntweapon', 'longblade', 'marksman', 'shortblade', 'spear'} -- !! Weapon health gets reduced by *net* damage dealt.
-    ARMOR = {'heavyarmor', 'lightarmor', 'mediumarmor'} -- !! Armor health gets reduced by the amount of incoming damage it *blocked*.
-    
+    SPELL = makeIndexEnum{'alteration', 'conjuration', 'destruction', 'illusion', 'mysticism', 'restoration'}
+    WEAPON = makeIndexEnum{'axe', 'bluntweapon', 'longblade', 'marksman', 'shortblade', 'spear'} -- !! Weapon health gets reduced by *net* damage dealt.
+    ARMOR = makeIndexEnum{'heavyarmor', 'lightarmor', 'mediumarmor'} -- !! Armor health gets reduced by the amount of incoming damage it *blocked*.
     },
-    scalers = {
-        new = function(self, t) end, -- t = {name = 'skillid', handler = function(skillid, source, options) ~dostuff end}
-    },
+
     -- SCRIPT LOGIC VARIABLES
 --     enteringLevelup = false
 }
-
--- SCALER CONSTRUCTOR
-
-Data.scaler.skills:new = function (t)
-    self[t.name] = skp.addSkillUsedHandler(t.name, t.handler)
-end
-
-
-
 
 -- RETURN || NEED THIS SO FILE DO THING
 return {Data = Data, Compat = Compat}
