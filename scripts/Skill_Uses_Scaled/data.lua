@@ -11,6 +11,7 @@ end
 local Data = {
 -- Player Data
     pc_held_spell = 'spellid',
+    pc_held_weapon = {itemid = 'id Not Assigned', object = 'object Not Assigned', condition = 0},
     pc_level = 0,
 -- Compatibility and Engine Data
     ATTRIBUTES = {'strength', 'intelligence', 'willpower', 'agility', 'speed', 'endurance', 'personality', 'luck'},
@@ -21,10 +22,11 @@ local Data = {
     },
     scaler_groups = {
     SPELL = makeKeyEnum{'alteration', 'conjuration', 'destruction', 'illusion', 'mysticism', 'restoration'},
-    WEAPON = makeKeyEnum{'axe', 'bluntweapon', 'longblade', 'marksman', 'shortblade', 'spear'}, -- !! Weapon health gets reduced by *net* damage dealt.
+    MELEE_WEAPON = makeKeyEnum{'axe', 'bluntweapon', 'longblade', 'shortblade', 'spear'}, -- !! Weapon health gets reduced by *net* damage dealt.
     ARMOR = makeKeyEnum{'heavyarmor', 'lightarmor', 'mediumarmor'}, -- !! Armor health gets reduced by the amount of incoming damage it *blocked*.
     },
-
+    STANCES = {nothing = 0, magic = 1, physical  = 2},
+    
     -- SCRIPT LOGIC VARIABLES
 --     enteringLevelup = false
 }
