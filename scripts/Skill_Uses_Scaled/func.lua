@@ -103,23 +103,26 @@ Fn.make_scalers = function()
         Dt.scalers:new{ 
             name = _skillid, 
             func = function(xp)
+
                 -- NOTE: We disable scaling while under the effect of Disintegrate Weapon, for you'd get ridiculous amounts of XP otherwise.
                 -- For the sake of robustness and simplicity, it's a tradeoff I'm willing to accept. I will NOT attempt to fix it.
                 if Fn.get_disintegrate_weapon then return xp end
-                local wp_obj = Fn.get_equipped_weapon().object
                 local condition_mult = core.getGMST('fWeaponDamageMult')
                 local condition_lost = Dt.pc_held_weapon.prevframe.condition - Fn.get_equipped_weapon().condition
                 local damage = condition_lost/condition_mult
-                local wp = types.Weapon.record(wp_obj)
+
                 -- If you have the Weapon-XP-Precision addon, we add weapon.lua to your weapon.
+                local wp_obj = Fn.get_equipped_weapon().object
                 if has_precision_addon then 
                     core.sendGlobalEvent('SUS_addScript', {script = 'weapon.lua',obj = wp_obj})
                 -- From there we restore half the condition lost, turning GMST 4X loss into the advertised 2X loss.
                     wp_obj:sendEvent('restoreCondition', condition_lost * 0.5)
                 end
+
                 -- NOTE: due to durability being an integer, you only lose more than 1 when dealing over 20 damage (unless you have changed your Durability GMST).
                 -- To deal with this, we use a different formula when your weapon deals under 20 damage.
                 -- If you have the Weapon-XP-Precision addon, this only gets used under 5 damage instead.
+                local wp = types.Weapon.record(wp_obj)
                 local min_cond_dmg = 2 / condition_mult
                 if damage < (min_cond_dmg - 0.001) then
                     local wp = types.Weapon.record(wp_obj)
@@ -130,12 +133,17 @@ Fn.make_scalers = function()
                              + getMinDamage(wp.thrustMaxDamage) + getMinDamage(wp.thrustMinDamage)
                              ) / 6
                 end
+
+
+                -- Now we finally do the actual scaling
                 local skill = types.Player.stats.skills[_skillid](self).base
                 --NOTE: due to durability being an integer, this will only change in steps of 10 damage (unless you have changed your Durability GMST).
                 -- If you have the Weapon-XP-Precision addon, this increases in steps of 2.5 damage instead.
-                xp = xp * damage/wp.speed/Melee_Damage_to_XP * 80/(40 + skill)
-                print(damage)
-                print(damage/wp.speed/Melee_Damage_to_XP)
+                xp = xp * damage/wp.speed/Melee_Damage_to_XP * 80/40 + math.min(skill, 100)) -- We use math.min here because hit rate can't go above 100, so we shouldn't scale past it.
+
+                -- For playtesting
+                print("SUS - Weapon XP Multiplier: x".. math.floor(100*damage/wp.speed/Melee_Damage_to_XP * 80/(40 + math.min(skill, 100)))/100)
+
                 return xp
             end
         }
