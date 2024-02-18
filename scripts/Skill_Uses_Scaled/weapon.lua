@@ -13,7 +13,7 @@ local types = require('openmw.types')
 
 return {
     eventHandlers = {
-        restoreCondition = function(amount)
+        modifyCondition = function(amount)
             types.Item.itemData(self).condition = types.Item.itemData(self).condition + math.max(math.floor(amount), 0)
         end
     }

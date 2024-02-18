@@ -55,7 +55,6 @@ local Dt = {
 function Dt.scalers:new(t)
     if (t.name) then self[t.name] = {} else error('You can\'t create a nameless scaler!') end
     self[t.name].func = t.func
-    print("Scaler constructed: "..t.name)
     -- set inheritance || DOESNT WORK AND I DONT KNOW WHY
 --     self[t.name].mt = {__index = self.default}
 --     setmetatable(self[t.name], self[t.name].mt)

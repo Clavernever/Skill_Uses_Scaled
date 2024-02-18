@@ -49,6 +49,18 @@
     > Cast chance is not accounted for, and failing still gives zero XP. This is on purpose.  
     > It's what cheap spells are _actually_ meant for.
 
+- There is an MP refund, and the formula is way too convoluted to explain here.  
+    All you need to know is what follows:  
+    - On default settings, refund starts at 15 skill and goes up to 30% at 100.  
+    - Refund keeps increasing after 100: you'll get ~35% at 150, 42% at 300, 45% at 600, etc. You'll never go over 50%.  
+    - One third your total armor weight is deducted from your skill value when refund is calculated.  
+        > This CAN send "refunds" into the negative, if your armor is heavy enough or your skill is too low.  
+        > Under normal gameplay, the resulting penalty shouldn't increase spell cost by more than 50%.  
+    - Bigger spells get a smaller refund %, but will always result in more magicka recovered per spell cast.  
+        > This gives pure mages a reason to use small spells, without punishing them for using large ones.  
+        > Note that this also affects penalties from heavy armor..  
+        > ..a smaller negative refund means a big spell's cost is _increased less_.  
+ 
 #### Enchanting
 
 - Enchanting XP scales with different things for each of it's uses:
