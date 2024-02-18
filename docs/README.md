@@ -40,20 +40,9 @@
     - More than 25 damage favours high ARs.  
     - This should help make leveling armor easier early on, and make light armor harder to max in the lategame (while heavy becomes easier and medium stays around vanilla).
 
-#### Weapon
-
-- [ ] Weapon XP scales with Weapon Skill and net damage dealt (taken from item condition lost)  
-    
-    `  XP Multiplier = Damage/25 * 80 /(40 + Skill)  `
-    
-    - Weapon Skill is a divider.  
-        > This is to tone down the effect of hitting a lot more often.  
-    - Condition Loss = NetDamage * \[fWeaponDamageMult->0.1\]  
-        > This means Strength factors directly into it, and so does enemy armor reduction.  
-        > As a result, XP will be mainly determined by _enemy HP_ rather than by how a$$ your weapon's minimal damage is.
 
 #### Magic
-- [ ] Magic XP scales with Max MP and MP spent.
+- [x] Magic XP scales with Max MP and MP spent.
 
     `  XP Multiplier = Spellcost/9 *4.8 /(4 + xINT + FortifyMP/100)  `
 
@@ -86,5 +75,30 @@
 > All of these skills scale with workaround or compromise variables.  
 > They will get better scaling formulas as soon as Lua API support is added for the missing factors.
 
+#### Weapon
+
+- [x] Weapon XP scales negatively with Weapon Skill and Weapon Speed, and positively with net Damage Dealt (taken from item condition lost)  
+    
+    `  XP Multiplier = Weapon Condition Lost / Weapon Speed * 80 /(40 + Skill)  `
+    
+    - XP per combat enocunter will be mainly determined by _enemy HP_ rather than by how a$$ your weapon's minimal damage is.
+    - Weapon Skill is a divider.  
+        > This is to tone down the effect of hitting a lot more often.  
+    - Weapon Speed is a divider
+        > This makes all weapons level at the same rate regardless of attack speed.
+    - Condition lost ignores your difficulty settings.
+        > So the effect of difficulty on weapon leveling is the same as vanilla.
+    - Condition lost uses post-mitigation damage, Strength and enemy AR both affect it.
+    - Condition lost only changes every 10 damage for weapons, unless you have changed a specific GMST.  
+        > This makes the formula more a staircase than a line.  
+        > This makes the formula not work when you're dealing less than 20 damage.  
+        > ..a compromise was made and a different formula is used when you deal low damage, which averages weapon stats.
+
+- The S_U_S_Weapon-XP-Percision addon doubles weapon degradation speed, and doubles Armorer repair rates.
+    - The addon is completely optional, but highly recommended, especially along [Weaponry of Resdayn Rebalanced](https://www.nexusmods.com/morrowind/mods/51247)
+    - It makes Armorer field repairs more valuable, and increases the need to carry backup weapons.
+    - It MASSIVELY reduces the number of cases where the alternate, compromised backup formula gets used.
+
 #### Throwing
+
 - [ ] Throwing XP scales with marksman level and average item damage.

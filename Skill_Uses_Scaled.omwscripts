@@ -1,1 +1,3 @@
 PLAYER: scripts/Skill_Uses_Scaled/core.lua
+CUSTOM: scripts/Skill_Uses_Scaled/weapon.lua
+GLOBAL: scripts/Skill_Uses_Scaled/global.lua
