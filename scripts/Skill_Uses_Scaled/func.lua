@@ -110,10 +110,6 @@ Fn.make_scalers = function()
                 local condition_mult = core.getGMST('fWeaponDamageMult')
                 local condition_lost = Dt.pc_held_weapon.prevframe.condition - Fn.get_equipped_weapon().condition
                 local damage = condition_lost/condition_mult
-                -- NOTE: due to durability being an integer, you only lose more than 1 when dealing over 20 damage (unless you have changed your Durability GMST).
-                -- To deal with this, we use a different formula when your weapon deals under 20 damage.
-                -- If you have the Weapon-XP-Precision addon, this only gets used under 5 damage instead.
-                local min_cond_dmg = 2 / condition_mult
                 local wp = types.Weapon.record(wp_obj)
                 -- If you have the Weapon-XP-Precision addon, we add weapon.lua to your weapon.
                 if has_precision_addon then 
@@ -121,6 +117,10 @@ Fn.make_scalers = function()
                 -- From there we restore half the condition lost, turning GMST 4X loss into the advertised 2X loss.
                     wp_obj:sendEvent('restoreCondition', condition_lost * 0.5)
                 end
+                -- NOTE: due to durability being an integer, you only lose more than 1 when dealing over 20 damage (unless you have changed your Durability GMST).
+                -- To deal with this, we use a different formula when your weapon deals under 20 damage.
+                -- If you have the Weapon-XP-Precision addon, this only gets used under 5 damage instead.
+                local min_cond_dmg = 2 / condition_mult
                 if damage < (min_cond_dmg - 0.001) then
                     local wp = types.Weapon.record(wp_obj)
                     local str_mod = types.Player.stats.attributes.strength(self).base * core.getGMST('fDamageStrengthMult') / 10 + core.getGMST('fDamageStrengthBase')
