@@ -115,10 +115,11 @@ Fn.make_scalers = function()
                 -- If you have the Weapon-XP-Precision addon, this only gets used under 5 damage instead.
                 local min_cond_dmg = 2 / condition_mult
                 local wp = types.Weapon.record(wp_obj)
+                -- If you have the Weapon-XP-Precision addon, we add weapon.lua to your weapon.
                 if has_precision_addon then 
-                    print("sending restore request to "..tostring(wp_obj)) 
-                    wp_obj:sendEvent('restoreCondition', condition_lost * 0.5)
                     core.sendGlobalEvent('SUS_addScript', {script = 'weapon.lua',obj = wp_obj})
+                -- From there we restore half the condition lost, turning GMST 4X loss into the advertised 2X loss.
+                    wp_obj:sendEvent('restoreCondition', condition_lost * 0.5)
                 end
                 if damage < (min_cond_dmg - 0.001) then
                     local wp = types.Weapon.record(wp_obj)
