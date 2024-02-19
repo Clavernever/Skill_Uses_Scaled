@@ -10,16 +10,22 @@ end
 return result
 end
 
+setpreviousval = function(key, val)
+    local oldval = false
+    return function(self, newval)
+        oldval = val
+        val = newval
+        self[key] = oldval
+    end
+end
+
 local Dt = {
 -- Player Data
     pc_held_spell = 'spellid',
-    pc_held_weapon_condition = { thisframe = 0, prevframe = 0},
-    pc_marksman_weapon = {
-        thisframe = {itemid = 'id Not Assigned', object = 'object Not Assigned', condition = 0},
-        prevframe = {itemid = 'id Not Assigned', object = 'object Not Assigned', condition = 0},
-    },
-    pc_marksman_projectile = {count = 0 ,itemid = 'id Not Assigned', object = 'object Not Assigned'},
-    pc_equipped_armor_condition = {thisframe = {}, prevframe = {} },
+    pc_equipped_armor_condition = {set_prevframe = setpreviousval('prevframe', {}) },
+    pc_held_weapon_condition    = {set_prevframe = setpreviousval('prevframe', 0) },
+    pc_marksman_weapon          = {set_prevframe = setpreviousval('prevframe', {itemid = 'id Not Assigned', object = 'object Not Assigned', condition = 0}), },
+    pc_marksman_projectile      = {count = 0 ,itemid = 'id Not Assigned', object = 'object Not Assigned'},
     pc_level = 0,
 -- Engine Data
     --ARMOR_SLOTS = {'Cuirass', 'Greaves', 'Helmet', 'LeftGauntlet', 'LeftPauldron', 'RightGauntlet', 'RightPauldron'}
@@ -71,6 +77,9 @@ local Dt = {
         fMedMaxMod          = core.getGMST('fMedMaxMod'         ),
         fUnarmoredBase1     = core.getGMST('fUnarmoredBase1'    ),
         fUnarmoredBase2     = core.getGMST('fUnarmoredBase2'    ),
+        iBlockMaxChance     = core.getGMST('iBlockMaxChance'    ),
+        iBlockMinChance     = core.getGMST('iBlockMinChance'    ),
+        
     },
     ATTRIBUTES = {'strength', 'intelligence', 'willpower', 'agility', 'speed', 'endurance', 'personality', 'luck'},
     SKILLS = {
@@ -90,6 +99,7 @@ local Dt = {
     },
     -- SCRIPT LOGIC VARIABLES
     has_precision_addon = false,
+    recent_activations = {},
 }
 
 --[] Setup metatable inheritance for Dt.scalers || DOESNT WORK AND I DONT KNOW WHY

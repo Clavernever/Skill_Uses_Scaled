@@ -82,7 +82,7 @@
 > All of these skills scale with workaround or compromise variables.  
 > They will get better scaling formulas as soon as Lua API support is added for the missing factors.
 
-#### Weapon
+#### Melee Weapons and Bows/Crossbows
 
 - [x] Weapon XP scales posi-negatively with Weapon Skill isn't affected by Weapon Speed, and scales positively with net Damage Dealt (taken from item condition lost)  
     
@@ -111,3 +111,24 @@
 #### Throwing
 
 - [ ] Throwing XP scales with marksman level and average item damage.
+
+#### Unarmored
+
+- [x] Unarmored XP scales positively with not getting hit and dodge rating, posi-negatively with unarmored skill, and negatively with armor weight.  
+    Armor weight, dodge rating and not-hit bonus are all configurable.
+    - Due to mechanical limitations Unarmored, unlike Armor skills, does _not_ scale with damage taken.  
+      Instead, you get more XP per hit the least you've been hit within a 60 second window.
+        > This means unarmored is a viable defensive skill for mages and assassins that prefer to avoid damage rather than resist it.  
+        > In vanilla, this kind of gameplay results in such low amounts of experience that you never meaningfully progress without trainers.  
+        > Now it will actually level at a decent rate if you don't get hit very often.  
+        > On the reverse, armor is a better choice if you intend to be hit a lot.
+    - Armor Weight slows down Unarmored progress.
+        > You can do with mixing some light armor in, such as a shield.
+        > You should avoid combining unarmored with heavy armor.
+        > They're opposite sides of a spectrum, and aren't meant to be used together.
+    - Argonians and Khajiit get a significant bonus to XP rates if fully clad in armor.
+        > Well, if clad in 8 pieces or more to be precise. No bonus if more than 3 slots are left unarmored.
+        > This is meant for Helmet, Boots and Shield (for 2 handers with some mods), but it can technically be any 3 slots you want.
+        > The bonus is divided among empty slots, so the overall effect is the same if you have 1, 2 or 3 slots open.
+        > The purpose of this bonus is to somewhat compensate for the inability to equip any boots and most helmets...
+        > ..letting your unarmored skill keep up with your armor skill, so the empty slots have a decent Armor Rating.
