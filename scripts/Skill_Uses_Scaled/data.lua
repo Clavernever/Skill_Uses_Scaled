@@ -1,3 +1,5 @@
+local types = require('openmw.types')
+local core  = require('openmw.core')
 
 -- TOOLS
 local function makeKeyEnum(keys)
@@ -11,20 +13,65 @@ end
 local Dt = {
 -- Player Data
     pc_held_spell = 'spellid',
-    pc_held_weapon = {
-        thisframe = {itemid = 'id Not Assigned', object = 'object Not Assigned', condition = 0},
-        prevframe = {itemid = 'id Not Assigned', object = 'object Not Assigned', condition = 0},
-    },
+    pc_held_weapon_condition = { thisframe = 0, prevframe = 0},
     pc_marksman_weapon = {
         thisframe = {itemid = 'id Not Assigned', object = 'object Not Assigned', condition = 0},
         prevframe = {itemid = 'id Not Assigned', object = 'object Not Assigned', condition = 0},
     },
-    pc_marksman_projectile = {
-        count = 0,
-        {itemid = 'id Not Assigned', object = 'object Not Assigned'},
-    },
+    pc_marksman_projectile = {count = 0 ,itemid = 'id Not Assigned', object = 'object Not Assigned'},
+    pc_equipped_armor_condition = {thisframe = {}, prevframe = {} },
     pc_level = 0,
 -- Engine Data
+    --ARMOR_SLOTS = {'Cuirass', 'Greaves', 'Helmet', 'LeftGauntlet', 'LeftPauldron', 'RightGauntlet', 'RightPauldron'}
+    ARMOR_SLOTS = {
+        [types.Armor.TYPE.Boots    ] = core.getGMST('iBootsWeight'   ),
+        [types.Armor.TYPE.Cuirass  ] = core.getGMST('iCuirassWeight' ),
+        [types.Armor.TYPE.Greaves  ] = core.getGMST('iGreavesWeight' ),
+        [types.Armor.TYPE.Helmet   ] = core.getGMST('iHelmWeight'    ),
+        [types.Armor.TYPE.LGauntlet] = core.getGMST('iGauntletWeight'),
+        [types.Armor.TYPE.LPauldron] = core.getGMST('iPauldronWeight'),
+        [types.Armor.TYPE.LBracer  ] = core.getGMST('iGauntletWeight'),
+        [types.Armor.TYPE.RBracer  ] = core.getGMST('iGauntletWeight'),
+        [types.Armor.TYPE.RGauntlet] = core.getGMST('iGauntletWeight'),
+        [types.Armor.TYPE.RPauldron] = core.getGMST('iPauldronWeight'),
+        [types.Armor.TYPE.Shield   ] = core.getGMST('iShieldWeight'  ),
+    },
+    ARMOR_SLOT_NAMES = {
+        [types.Armor.TYPE.Boots    ] = 'Boots',
+        [types.Armor.TYPE.Cuirass  ] = 'Cuirass',
+        [types.Armor.TYPE.Greaves  ] = 'Greaves',
+        [types.Armor.TYPE.Helmet   ] = 'Helmet',
+        [types.Armor.TYPE.LGauntlet] = 'LGauntlet',
+        [types.Armor.TYPE.LPauldron] = 'LPauldron',
+        [types.Armor.TYPE.LBracer  ] = 'LBracer',
+        [types.Armor.TYPE.RBracer  ] = 'RBracer',
+        [types.Armor.TYPE.RGauntlet] = 'RGauntlet',
+        [types.Armor.TYPE.RPauldron] = 'RPauldron',
+        [types.Armor.TYPE.Shield   ] = 'Shield',
+    },
+    ARMOR_RATING_WEIGHTS= {
+        [types.Armor.TYPE.Cuirass  ] = 0.3 ,
+        [types.Armor.TYPE.Shield   ] = 0.1 ,
+        [types.Armor.TYPE.Helmet   ] = 0.1 ,
+        [types.Armor.TYPE.Greaves  ] = 0.1 ,
+        [types.Armor.TYPE.Boots    ] = 0.1 ,
+        [types.Armor.TYPE.LPauldron] = 0.1 ,
+        [types.Armor.TYPE.RPauldron] = 0.1 ,
+        [types.Armor.TYPE.LGauntlet] = 0.05,
+        [types.Armor.TYPE.RGauntlet] = 0.05,
+        [types.Armor.TYPE.LBracer  ] = 0.05,
+        [types.Armor.TYPE.RBracer  ] = 0.05,
+    },
+    GMST = {
+        iBaseArmorSkill     = core.getGMST('iBaseArmorSkill'    ),
+        fWeaponDamageMult   = core.getGMST('fWeaponDamageMult'  ),
+        fDamageStrengthMult = core.getGMST('fDamageStrengthMult'),
+        fDamageStrengthBase = core.getGMST('fDamageStrengthBase'),
+        fLightMaxMod        = core.getGMST('fLightMaxMod'       ),
+        fMedMaxMod          = core.getGMST('fMedMaxMod'         ),
+        fUnarmoredBase1     = core.getGMST('fUnarmoredBase1'    ),
+        fUnarmoredBase2     = core.getGMST('fUnarmoredBase2'    ),
+    },
     ATTRIBUTES = {'strength', 'intelligence', 'willpower', 'agility', 'speed', 'endurance', 'personality', 'luck'},
     SKILLS = {
         'acrobatics' , 'alchemy'  , 'alteration' , 'armorer'   , 'athletics' , 'axe'       , 'block'    , 'bluntweapon', 'conjuration',
@@ -32,9 +79,9 @@ local Dt = {
         'mercantile' , 'mysticism', 'restoration', 'security'  , 'shortblade', 'sneak'     , 'spear'    , 'speechcraft', 'unarmored'
     },
     scaler_groups = {
-        SPELL = {'alteration', 'conjuration', 'destruction', 'illusion', 'mysticism', 'restoration'},
+        SPELL        = {'alteration', 'conjuration', 'destruction', 'illusion', 'mysticism', 'restoration'},
         MELEE_WEAPON = {'axe', 'bluntweapon', 'longblade', 'shortblade', 'spear'}, -- !! Weapon health gets reduced by *net* damage dealt.
-        ARMOR = {'heavyarmor', 'lightarmor', 'mediumarmor'}, -- !! Armor health gets reduced by the amount of incoming damage it *blocked*.
+        ARMOR        = {'heavyarmor', 'lightarmor', 'mediumarmor'}, -- !! Armor health gets reduced by the amount of incoming damage it *blocked*.
     },
     STANCES = {nothing = 0, magic = 1, physical  = 2},
     scalers = {

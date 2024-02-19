@@ -29,31 +29,34 @@
 
 ## TRACKABLE SKILLS
 
-> All of these skills scale with their ideal variables.
+> All of these skills scale with their ideal variables.  
 > They may receive balance tweaks, but are unlikely to change in core behavior.
 
-#### Armor
+#### Armor (Light/Medium/Heavy)
 
-- [ ] Armor XP scales with Max HP, Base AR and amount of damage prevented (taken from item condition lost).  
-    On the base AR point specifically, the middle ground should be somewhere around 25 damage:  
-    - Less than 25 damage favours low ARs.
-    - More than 25 damage favours high ARs.  
-    - This should help make leveling armor easier early on, and make light armor harder to max in the lategame (while heavy becomes easier and medium stays around vanilla).
-
+- [x] Armor XP scales positively with pre-mitigation damage received, and with current armor skill.  
+    
+    `  XP Multiplier = Damage/6 * 60 / (30 + Skill)  `
+    
+    - You benefit little from getting hit by rats and other vermin.
+    - Early armor levels are easier to get. Later ones harder.
+    - Your Armor Rating / Armor Quality does not meaningfully affect XP rates, your _skill_ does.
+      > There really isn't much more to say.. armor scaling is very clean. It _just works_.
 
 #### Magic
-- [x] Magic XP scales with Max MP and MP spent.
+- [x] Magic XP scales positively with Spell Cost, and less positively with Max MP.
 
     `  XP Multiplier = Spellcost/9 *4.8 /(4 + xINT + FortifyMP/100)  `
 
     > Cast chance is not accounted for, and failing still gives zero XP. This is on purpose.  
-    > It's what cheap spells are _actually_ meant for.
+    > If you have trouble casting use cheaper spells, it's what they're _actually_ meant for.
 
 - There is an MP refund, and the formula is way too convoluted to explain here.  
     All you need to know is what follows:  
-    - On default settings, refund starts at 15 skill and goes up to 30% at 100.  
-    - Refund keeps increasing after 100: you'll get ~35% at 150, 42% at 300, 45% at 600, etc. You'll never go over 50%.  
-    - One third your total armor weight is deducted from your skill value when refund is calculated.  
+    - On default settings, refund starts at 15 skill and goes up to ~28% at 100.  
+    - Refund keeps increasing after 100: you'll get ~33% at 150, 40% at 300, 43% at 600, etc. You'll never go over 50%.  
+    - Half your total armor weight is deducted from your skill value when refund is calculated.  
+        Can be disabled if you're already using another mod that adds an armor penalty. [Co.Re](https://www.nexusmods.com/morrowind/mods/53663) comes to mind.  
         > This CAN send "refunds" into the negative, if your armor is heavy enough or your skill is too low.  
         > Under normal gameplay, the resulting penalty shouldn't increase spell cost by more than 50%.  
     - Bigger spells get a smaller refund %, but will always result in more magicka recovered per spell cast.  
@@ -89,27 +92,29 @@
 
 #### Weapon
 
-- [x] Weapon XP scales negatively with Weapon Skill and Weapon Speed, and positively with net Damage Dealt (taken from item condition lost)  
+- [x] Weapon XP scales posi-negatively with Weapon Skill isn't affected by Weapon Speed, and scales positively with net Damage Dealt (taken from item condition lost)  
     
-    `  XP Multiplier = Weapon Condition Lost / Weapon Speed * 80 /(40 + Skill)  `
+    `  XP Multiplier = Damage/10 / Weapon Speed * 80 /(40 + Skill)  `
     
     - XP per combat enocunter will be mainly determined by _enemy HP_ rather than by how a$$ your weapon's minimal damage is.
-    - Weapon Skill is a divider.  
-        > This is to tone down the effect of hitting a lot more often.  
-    - Weapon Speed is a divider
-        > This makes all weapons level at the same rate regardless of attack speed.
-    - Condition lost ignores your difficulty settings.
-        > So the effect of difficulty on weapon leveling is the same as vanilla.
-    - Condition lost uses post-mitigation damage, Strength and enemy AR both affect it.
+    - Weapon Skill is set as a divider, to stabilise the effect of hit chance on levling.  
+        > This makes high levels not result in uberfast XP.  
+        > Likewise, it also tones down the badness of missing a lot when skill is low.
+    - All weapons level at the same rate regardless of attack speed
+        > Yes, it's dividing in the formula. Don't get scared, all that does is neutralise it.  
+    - Damage is counted before your difficulty settings are applied.
+        > So the effect of difficulty (if any) on weapon leveling is the same as vanilla.
     - Condition lost only changes every 10 damage for weapons, unless you have changed a specific GMST.  
         > This makes the formula more a staircase than a line.  
         > This makes the formula not work when you're dealing less than 20 damage.  
         > ..a compromise was made and a different formula is used when you deal low damage, which averages weapon stats.
+        - The S_U_S_Weapon-XP-Percision addon eliminates this issue almost completely.
 
 - The S_U_S_Weapon-XP-Percision addon doubles weapon degradation speed, and doubles Armorer repair rates.
     - The addon is completely optional, but highly recommended, especially along [Weaponry of Resdayn Rebalanced](https://www.nexusmods.com/morrowind/mods/51247)
     - It makes Armorer field repairs more valuable, and increases the need to carry backup weapons.
     - It MASSIVELY reduces the number of cases where the alternate, compromised backup formula gets used.
+        > It basically goes back to being a "Trackable Skill" if you have it.
 
 #### Throwing
 

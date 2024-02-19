@@ -17,15 +17,49 @@ local MP_Refund_Max_Percent  = 50 -- Refund will never go above this Percentage 
 local Melee_Damage_to_XP     = 10 -- This much physical damage is equivalent to one vanilla weapon hit. Roughly.
 local Weapon_Wear_Mult       =  2 -- Directly multiplies Vanilla durability loss. Only takes effect if you have enabled S_U_S_Weapon-XP-Precision.
                                   -- | You'll always lose at least 1 durability per hit, even if you set this to 0.
+
+local Damage_To_XP  =  6          -- This much pre-mitigation physical damage is equivalent to one vanilla armor hit. Roughly.
+
 -----------------------------------------------------------------------------------------------------------
 
 -- TOOLS
 local eps = 0.001
-function equal(a,b)                         return (math.abs(b - a) < eps)                                  end
+function equal(a,b)          return (math.abs(b - a) < eps)                                  end
+
+local function printify(num) return math.floor(num*100)/100                                    end
+
 local function get_val(not_table_or_func)   return not_table_or_func                                        end
+
+local function get(var) -- var must be serializable, recursions WILL stack overflow :D
+    if type(var)  ~= 'table' then return var
+    else
+        local deepcopy = {}
+        for _key, _value in pairs(var) do deepcopy[_key] = get(_value) end
+        return deepcopy
+    end
+end
+
 local function table_has_key(table, thing)
     if type(thing) == 'number' then  for k, v in pairs(table) do  if equal(v, thing) then return thing end  end
     else  for k, v in pairs(table) do  if v == thing then return thing end  end
+    end
+end
+
+-- Credit to zackhasacat for this one
+-- I shortened it by removing checks I don't need (due to where it's used)
+-- Also made it use and return SUS Dt values
+function getArmorType(armor_obj)
+    local lightMultiplier = Dt.GMST.fLightMaxMod + 0.0005
+    local medMultiplier   = Dt.GMST.fMedMaxMod   + 0.0005
+    local armorType       = types.Armor.record(armor_obj).type
+    local weight          = types.Armor.record(armor_obj).weight
+    local armorTypeWeight = math.floor(Dt.ARMOR_SLOTS[armorType])
+    if     weight <= armorTypeWeight * lightMultiplier then -- print("SKILL: lightarmor")
+        return 'lightarmor'
+    elseif weight <= armorTypeWeight * medMultiplier   then -- print("SKILL: mediumarmor")
+        return 'mediumarmor'
+    else                                                    -- print("SKILL: heavyarmor")
+        return 'heavyarmor'
     end
 end
 
@@ -41,7 +75,7 @@ Fn.get_magic_modifier = function()
     for _id, _params in pairs(types.Actor.activeSpells(self)) do
         if core.magic.spells[_params.id] then -- we only wanna check SPELL types, since abilities never come from enchantments
             for _, _effect in pairs(_params.effects) do
-                if _effect.id      == 'fortifymaximummagicka' then modifier = modifier + _effect.magnitudeThisFrame / 10
+                if _effect.id     == 'fortifymaximummagicka' then modifier = modifier + _effect.magnitudeThisFrame / 10
                 elseif _effect.id == 'fortifymagicka'        then modifier = modifier + _effect.magnitudeThisFrame / 100
                 end
             end
@@ -58,14 +92,17 @@ Fn.get_equipped_armor = function()
     return armor_list
 end
 
-Fn.has_disintegrate_weapon = function()
-    local API_Spelltype_Ability = get_val(core.magic.SPELL_TYPE.Ability)
+Fn.has_effect = function(effect)
     local haseffect = false
     for _id, _params in pairs(types.Actor.activeSpells(self)) do
-        if core.magic.spells[_params.id] then -- we only wanna check SPELL types, since abilities never come from enchantments
+        if core.magic.spells[_params.id] then
             for _, _effect in pairs(_params.effects) do
---                 if _effect.id      == 'disintegrateweapon' then modifier = modifier + _effect.magnitudeThisFrame end
-                if _effect.id      == 'disintegrateweapon' then haseffect = true end
+                if _effect.id == effect then haseffect = true end
+            end
+        end
+        if core.magic.enchantments[_params.id] then
+            for _, _effect in pairs(_params.effects) do
+                if _effect.id == effect then haseffect = true end
             end
         end
     end
@@ -82,6 +119,58 @@ Fn.get_equipped_weapon = function() --Returns a table with three values: the obj
         end
     end
     return weapon
+end
+
+Fn.get_hit_armorpiece = function()
+    for _, _obj in ipairs(Fn.get_equipped_armor()) do
+        local slot = types.Armor.record(_obj).type
+        if not equal(Dt.pc_equipped_armor_condition.prevframe[slot], types.Item.itemData(_obj).condition) then return _obj end
+    end
+end
+
+Fn.get_magic_shield = function()
+    local API_Spelltype_Ability = get_val(core.magic.SPELL_TYPE.Ability)
+    local modifier = 0
+    for _id, _params in pairs(types.Actor.activeSpells(self)) do
+        if core.magic.spells[_params.id] then -- we only wanna check SPELL types, since abilities never come from enchantments
+            for _, _effect in pairs(_params.effects) do
+                if _effect.id     == 'shield' then modifier = modifier + _effect.magnitudeThisFrame end
+            end
+        end
+    end
+    return modifier
+end
+
+Fn.get_AR = function()
+    local skill       = 0
+    local rating      = 0
+    local armor_slots = get(Dt.ARMOR_SLOTS) -- We copy this table. We could have copied ARMOR_RATING_WEIGHTS too, all that matters is that it includes all slots.
+    local clean_slots = function(_slot) -- This is to guarantee we don't get ghost unarmored slots for gauntlets and bracers
+        if     _slot == types.Armor.TYPE.LBracer or _slot == types.Armor.TYPE.LGauntlet then
+            armor_slots[types.Armor.TYPE.LBracer  ] = nil
+            armor_slots[types.Armor.TYPE.LGauntlet] = nil
+        elseif _slot == types.Armor.TYPE.RBracer or _slot == types.Armor.TYPE.RGauntlet then
+            armor_slots[types.Armor.TYPE.RBracer  ] = nil
+            armor_slots[types.Armor.TYPE.RGauntlet] = nil
+        else armor_slots[_slot] = nil
+        end
+    end
+    -- Add AR from all slots with armor
+    for _, _obj in ipairs(Fn.get_equipped_armor()) do
+        skill  = types.Player.stats.skills[getArmorType(_obj)](self).modified
+        local slot   = types.Armor.record(_obj).type
+        local hp_mod = types.Item.itemData(_obj).condition / types.Armor.record(_obj).health
+        rating = rating + types.Armor.record(_obj).baseArmor * hp_mod * Dt.ARMOR_RATING_WEIGHTS[slot] * skill / Dt.GMST.iBaseArmorSkill
+        clean_slots(slot)
+    end
+    -- Add AR for slots that didn't have armor
+    for _slot, _ in pairs(armor_slots) do
+        skill = types.Player.stats.skills.unarmored(self).modified
+        rating = rating + skill * Dt.GMST.fUnarmoredBase1 * skill * Dt.GMST.fUnarmoredBase2 * Dt.ARMOR_RATING_WEIGHTS[slot]-- Why have 2 GMSTs for 1 number? Precision? Yeah precision I guess.
+        clean_slots(slot)
+    end
+    rating = rating + Fn.get_magic_shield()
+    return rating
 end
 
 -- Fn.get_marksman_weapon = function() --Returns a table with three values: the object, it's id and it's current condition
@@ -104,7 +193,32 @@ end
 
 
 Fn.make_scalers = function()
-    -- Magic School Scaling
+    -- ARMOR Scaling
+    for _, _skillid in ipairs(Dt.scaler_groups.ARMOR) do
+        Dt.scalers:new{
+            name = _skillid,
+            func = function(xp)
+                -- NOTE: We disable scaling while under the effect of Disintegrate Armor, for you'd get ridiculous amounts of XP otherwise.
+                -- For the sake of robustness and simplicity, it's a tradeoff I'm willing to accept. I will NOT attempt to fix it.
+                if Fn.has_effect('disintegratearmor') then return xp end
+
+                local armor_obj = Fn.get_hit_armorpiece()
+                -- We estimate incoming damage from AR and condition lost instead of directly using condition lost.
+                -- This helps avoid low ARs becoming a pit of neverleveling.
+                local condition_lost = Dt.pc_equipped_armor_condition.prevframe[types.Armor.record(armor_obj).type] - types.Item.itemData(armor_obj).condition
+                local rating = Fn.get_AR()
+                local damage = (condition_lost * rating)/(rating - condition_lost)
+                -- Armor skill and AR GMSTs are combined to make leveling below base AR faster, and above slower.
+                local skill = types.Player.stats.skills[_skillid](self).base
+
+                print("SUS - Armor XP Mult: ".. printify(damage/Damage_To_XP * 2*Dt.GMST.iBaseArmorSkill / (Dt.GMST.iBaseArmorSkill + skill))..' | Damage Received: '.. printify(damage))
+
+                xp = xp * damage/Damage_To_XP * 2*Dt.GMST.iBaseArmorSkill / (Dt.GMST.iBaseArmorSkill + skill)
+                return xp
+            end
+        }
+    end
+    -- SPELL Scaling
     for _, _skillid in ipairs(Dt.scaler_groups.SPELL) do
         Dt.scalers:new{ 
             name = _skillid, 
@@ -138,7 +252,7 @@ Fn.make_scalers = function()
             end
         }
     end
-    -- Melee Weapon Scaling
+    -- MELEE Scaling
     for _, _skillid in ipairs(Dt.scaler_groups.MELEE_WEAPON) do
         Dt.scalers:new{ 
             name = _skillid, 
@@ -146,10 +260,9 @@ Fn.make_scalers = function()
 
                 -- NOTE: We disable scaling while under the effect of Disintegrate Weapon, for you'd get ridiculous amounts of XP otherwise.
                 -- For the sake of robustness and simplicity, it's a tradeoff I'm willing to accept. I will NOT attempt to fix it.
-                if Fn.get_disintegrate_weapon then return xp end
-                local condition_mult = core.getGMST('fWeaponDamageMult')
-                local condition_lost = Dt.pc_held_weapon.prevframe.condition - Fn.get_equipped_weapon().condition
-                local damage = condition_lost/condition_mult
+                if Fn.has_effect('disintegrateweapon') then return xp end
+                local condition_lost = Dt.pc_held_weapon_condition.prevframe - Fn.get_equipped_weapon().condition
+                local damage = condition_lost/Dt.GMST.fWeaponDamageMult
 
                 -- If you have the Weapon-XP-Precision addon, we add weapon.lua to your weapon.
                 local wp_obj = Fn.get_equipped_weapon().object
@@ -157,7 +270,7 @@ Fn.make_scalers = function()
                     core.sendGlobalEvent('SUS_addScript', {script = 'weapon.lua',obj = wp_obj})
                 -- From there we reduce/increase condition lost by the difference between the actual amount lost and what you would have lost with Vanilla * Weapon_Wear_Mult
                 -- This MAGICALLY turns your GMST loss into the advertised 2X vanilla loss (or whatever Weapon_Wear_Mult is set to). WHY WAS IT SO HARD TO GET THIS FORMULA RIGHT. !!AAAAAA.
-                    local codition_delta = - condition_lost * (Weapon_Wear_Mult/10/condition_mult - 1)
+                    local codition_delta = - condition_lost * (Weapon_Wear_Mult/10/Dt.GMST.fWeaponDamageMult - 1)
                     wp_obj:sendEvent('modifyCondition', codition_delta)
                 end
 
@@ -165,10 +278,10 @@ Fn.make_scalers = function()
                 -- To deal with this, we use a different formula when your weapon deals under 20 damage.
                 -- If you have the Weapon-XP-Precision addon, this only gets used under 5 damage instead.
                 local wp = types.Weapon.record(wp_obj)
-                local min_cond_dmg = 2 / condition_mult
+                local min_cond_dmg = 2 / Dt.GMST.fWeaponDamageMult
                 if damage < (min_cond_dmg - 0.001) then
                     local wp = types.Weapon.record(wp_obj)
-                    local str_mod = types.Player.stats.attributes.strength(self).base * core.getGMST('fDamageStrengthMult') / 10 + core.getGMST('fDamageStrengthBase')
+                    local str_mod = types.Player.stats.attributes.strength(self).base * Dt.GMST.fDamageStrengthMult / 10 + Dt.GMST.fDamageStrengthBase
                     local function getMinDamage(val) return math.min(min_cond_dmg, val * str_mod) end
                     damage = ( getMinDamage(wp.chopMaxDamage  ) + getMinDamage(wp.chopMinDamage  )
                              + getMinDamage(wp.slashMaxDamage ) + getMinDamage(wp.slashMinDamage )
@@ -180,8 +293,7 @@ Fn.make_scalers = function()
                 local skill = types.Player.stats.skills[_skillid](self).base
                 --NOTE: due to durability being an integer, this will only change in steps of 10 damage (unless you have changed your Durability GMST).
                 -- If you have the Weapon-XP-Precision addon, this increases in steps of 2.5 damage instead.
-                xp = xp * damage/wp.speed/Melee_Damage_to_XP * 80/40 + math.min(skill, 100) -- We use math.min here because hit rate can't go above 100, so we shouldn't scale past it.
-
+                xp = xp * damage/wp.speed/Melee_Damage_to_XP * 80/(40 + math.min(skill, 100)) -- We use math.min here because hit rate can't go above 100, so we shouldn't scale past it.
                 -- For playtesting
                 print("SUS - Weapon XP Multiplier: x".. math.floor(100*damage/wp.speed/Melee_Damage_to_XP * 80/(40 + math.min(skill, 100)))/100)
 
