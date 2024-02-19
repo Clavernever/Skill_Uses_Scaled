@@ -210,10 +210,10 @@ Fn.make_scalers = function()
                 local damage = (condition_lost * rating)/(rating - condition_lost)
                 -- Armor skill and AR GMSTs are combined to make leveling below base AR faster, and above slower.
                 local skill = types.Player.stats.skills[_skillid](self).base
+                xp = xp * damage/Damage_To_XP * 2*Dt.GMST.iBaseArmorSkill / (Dt.GMST.iBaseArmorSkill + skill)
 
                 print("SUS - Armor XP Mult: ".. printify(damage/Damage_To_XP * 2*Dt.GMST.iBaseArmorSkill / (Dt.GMST.iBaseArmorSkill + skill))..' | Damage Received: '.. printify(damage))
 
-                xp = xp * damage/Damage_To_XP * 2*Dt.GMST.iBaseArmorSkill / (Dt.GMST.iBaseArmorSkill + skill)
                 return xp
             end
         }
@@ -231,22 +231,21 @@ Fn.make_scalers = function()
                 -- MP Refund:
                                             -- Calculate factors
                 local armor_weight = 0
-                for _, _object in ipairs(Fn.get_equipped_armor()) do 
-                    armor_weight = armor_weight + types.Armor.record(_object).weight
-                end
+                for _, _obj in ipairs(Fn.get_equipped_armor()) do armor_weight = armor_weight + types.Armor.record(_obj).weight end
                 local armor_offset = armor_weight * MP_Refund_Armor_Mult
-                print('armor_weight: '.. math.floor(armor_weight*100)/100 .. ' | armor_offset: '.. math.floor(armor_offset*100)/100 )
-                local skill = types.Player.stats.skills[_skillid](self).base
                 local cost_factor = Magicka_to_XP / (Magicka_to_XP + spell_cost/Magicka_to_XP)
+                local skill = types.Player.stats.skills[_skillid](self).base
                 local skill_factor = (skill - MP_Refund_Skill_Offset - armor_offset) / (40 + skill)
-                print('cost_factor: '.. math.floor(cost_factor*100)/100 .. ' | skill_factor: '.. math.floor(skill_factor*100)/100 )
+
                                             -- Calculate refund
                 local refund = spell_cost * cost_factor * skill_factor * MP_Refund_Max_Percent /100
-                print("SUS - Refund: ".. math.floor(refund/spell_cost*100)..'% | '.. math.floor(refund*100)/100 ..' MP')
+
                                             -- Apply refund
                 --Yes, this will apply even if current > max.
                 --To keep vanilla compatibility, we have to consider current>max as a valid gameplay state, since Fortify Magicka doesn't increase Max MP.
                 types.Player.stats.dynamic.magicka(self).current = types.Player.stats.dynamic.magicka(self).current + refund
+
+                print("SUS - Refund: ".. math.floor(refund/spell_cost*100)..'% | '.. math.floor(refund*100)/100 ..' MP')
 
                 return xp
             end
@@ -294,7 +293,7 @@ Fn.make_scalers = function()
                 --NOTE: due to durability being an integer, this will only change in steps of 10 damage (unless you have changed your Durability GMST).
                 -- If you have the Weapon-XP-Precision addon, this increases in steps of 2.5 damage instead.
                 xp = xp * damage/wp.speed/Melee_Damage_to_XP * 80/(40 + math.min(skill, 100)) -- We use math.min here because hit rate can't go above 100, so we shouldn't scale past it.
-                -- For playtesting
+
                 print("SUS - Weapon XP Multiplier: x".. math.floor(100*damage/wp.speed/Melee_Damage_to_XP * 80/(40 + math.min(skill, 100)))/100)
 
                 return xp

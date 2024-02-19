@@ -1,15 +1,7 @@
 ## GENERAL FACTORS
 
-- **More Success Chance usually means less XP per success, but still more XP in general.**  
-    Some examples:
-  
-    - More Max MP means less Spell School XP per magic point spent, but still more XP per full MP bar spent.
-    - More Max HP means less Armor XP per point of damage taken, but still more XP per full HP bar spent.
-    - Higher Weapon Skill means less XP per damage point dealt, but the DPS increase from both still results in faster leveling per minute in combat.  
-    - Higher Alchemy means less XP per potion, but the increase in number of potions made still results in more total XP per amount of ingredients spent .
-
 - **Gains are usually balanced around some average early-midgame value.**  
-    Here's the fatcors I balanced around:
+    Here's the factors I balanced around:
   
     - Making the spammage of ultracheap 'training' options an unoptimal choice.  
         > 1 cost spells, 1 damage attacks, mudcrab struggle sessions.. you know the drill.  
@@ -36,7 +28,7 @@
 
 - [x] Armor XP scales positively with pre-mitigation damage received, and with current armor skill.  
     
-    `  XP Multiplier = Damage/6 * 60 / (30 + Skill)  `
+    `  XP Multiplier = Damage/[6] * 60 / (30 + Skill)  `
     
     - You benefit little from getting hit by rats and other vermin.
     - Early armor levels are easier to get. Later ones harder.
@@ -46,7 +38,7 @@
 #### Magic
 - [x] Magic XP scales positively with Spell Cost, and less positively with Max MP.
 
-    `  XP Multiplier = Spellcost/9 *4.8 /(4 + xINT + FortifyMP/100)  `
+    `  XP Multiplier = Spellcost/[9] *4.8 /(4 + xINT + FortifyMP/100)  `
 
     > Cast chance is not accounted for, and failing still gives zero XP. This is on purpose.  
     > If you have trouble casting use cheaper spells, it's what they're _actually_ meant for.
@@ -94,7 +86,7 @@
 
 - [x] Weapon XP scales posi-negatively with Weapon Skill isn't affected by Weapon Speed, and scales positively with net Damage Dealt (taken from item condition lost)  
     
-    `  XP Multiplier = Damage/10 / Weapon Speed * 80 /(40 + Skill)  `
+    `  XP Multiplier = Damage/[10] / Weapon Speed * 80 /(40 + Skill)  `
     
     - XP per combat enocunter will be mainly determined by _enemy HP_ rather than by how a$$ your weapon's minimal damage is.
     - Weapon Skill is set as a divider, to stabilise the effect of hit chance on levling.  
@@ -108,9 +100,9 @@
         > This makes the formula more a staircase than a line.  
         > This makes the formula not work when you're dealing less than 20 damage.  
         > ..a compromise was made and a different formula is used when you deal low damage, which averages weapon stats.
-        - The S_U_S_Weapon-XP-Percision addon eliminates this issue almost completely.
+        - The ***S_U_S_Weapon-XP-Precision*** addon eliminates this issue almost completely.
 
-- The S_U_S_Weapon-XP-Percision addon doubles weapon degradation speed, and doubles Armorer repair rates.
+- The ***S_U_S_Weapon-XP-Precision*** addon doubles weapon degradation speed, and doubles Armorer repair rates.
     - The addon is completely optional, but highly recommended, especially along [Weaponry of Resdayn Rebalanced](https://www.nexusmods.com/morrowind/mods/51247)
     - It makes Armorer field repairs more valuable, and increases the need to carry backup weapons.
     - It MASSIVELY reduces the number of cases where the alternate, compromised backup formula gets used.
