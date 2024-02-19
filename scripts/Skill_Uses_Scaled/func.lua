@@ -314,7 +314,6 @@ Fn.make_scalers = function()
 
             local xp = xp * skill_factor * beast_factor * dodge_factor * gank_factor
 
-            print("beast_factor: "..printify(beast_factor)..' | gank_factor: '..printify(gank_factor)..' | skill_factor: '..printify(skill_factor))
             print("SUS - Unarmored XP Mult: ".. printify(skill_factor * beast_factor * dodge_factor * gank_factor))
 
             return xp
