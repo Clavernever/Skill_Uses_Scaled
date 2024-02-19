@@ -92,7 +92,7 @@
 
 #### Weapon
 
-- [x] Weapon XP scales posi-negatively with Weapon Skill isn't affected by Weapon Speed, and scales positively with net Damage Dealt (taken from item condition lost)  
+- [x] Weapon XP scales posi-negatively with Weapon Skill, isn't affected by Weapon Speed, and scales positively with net Damage Dealt (taken from item condition lost)  
     
     `  XP Multiplier = Damage/10 / Weapon Speed * 80 /(40 + Skill)  `
     
