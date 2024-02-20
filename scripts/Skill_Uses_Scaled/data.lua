@@ -32,9 +32,9 @@ local Dt = {
     pc_held_spell = 'spellid',
     pc_equipped_armor_condition = {set_prevframe = setpreviousval('prevframe', {}) },
     pc_held_weapon_condition    = {set_prevframe = setpreviousval('prevframe', 0) },
-    pc_marksman_weapon          = {set_prevframe = setpreviousval('prevframe', {itemid = 'id Not Assigned', object = 'object Not Assigned', condition = 0}), },
-    pc_marksman_ammo    = '_obj', --Always points directly at an object.
-    pc_marksman_thrown  = '_obj', --Same as ammo, but we keep track separately because they can be simultaneously equipped (even though thrown weapons are always their own ammo)
+    pc_bow    = {set_prevframe = setpreviousval('prevframe', {itemid = '_id', object = '_obj', condition = 0}), },
+    pc_ammo   = '_obj', --Always points directly at an object. -- Currently unused, since bow/crossbow durability loss includes ammo damage.
+    pc_thrown = '_obj', --Same as ammo, but we keep track separately because they can be simultaneously equipped (even though thrown weapons are always their own ammo)
     pc_level = 0,
 -- Engine Data
     WEAPON_TYPES = {

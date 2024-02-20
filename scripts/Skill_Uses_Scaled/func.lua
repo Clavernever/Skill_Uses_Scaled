@@ -24,11 +24,11 @@ local Unarmored_Beast_Races = 6   -- Unarmored levels this times faster when you
                                   -- | It's meant to make the heavy handicap from not being able to equip head and feet armor less bad, if you're running an armored character.
                                   -- | It's NOT meant to help, and will NOT affect, fully unarmored characters. Unarmored beast characters level the same as all others.
 
-local Armor_Damage_To_XP = 6  -- This much pre-mitigation physical damage is equivalent to one vanilla armor hit. Roughly.
-local Block_Damage_To_XP = 15 -- This much pre-mitigation physical damage is equivalent to one vanilla block hit. Roughly.
+local Armor_Damage_To_XP  = 6  -- This much pre-mitigation physical damage is equivalent to one vanilla armor hit. Roughly.
+local Block_Damage_To_XP  = 15 -- This much pre-mitigation physical damage is equivalent to one vanilla block hit. Roughly.
 
-local Melee_Damage_to_XP = 10 -- This much physical damage is equivalent to one vanilla weapon hit. Roughly.
-local Weapon_Wear_Mult   = 2  -- Directly multiplies Vanilla durability loss. Only takes effect if you have enabled S_U_S_Weapon-XP-Precision.
+local Weapon_Damage_to_XP = 10 -- This much physical damage is equivalent to one vanilla weapon hit. Roughly.
+local Weapon_Wear_Mult    = 2  -- Directly multiplies Vanilla durability loss. Only takes effect if you have enabled S_U_S_Weapon-XP-Precision.
                               -- | You'll always lose at least 1 durability per hit, even if you set this to 0.
 
 -----------------------------------------------------------------------------------------------------------
@@ -60,6 +60,7 @@ local function makecounter(val)
     local count = val
     return function(mod)
         count = count + mod
+        print(count)
         return count
     end
 end
@@ -152,17 +153,13 @@ Fn.getters = {
     AMMO = function(_object)
         if not _object then return end
         if _object.type == types.Weapon and Dt.WEAPON_TYPES.AMMO[types.Weapon.record(_object).type]     then
-            if not Dt.equipment then Dt.equipment = {} end
-            Dt.equipment.itemid = types.Weapon.record(_object).id
-            Dt.equipment.object = _object
+            Dt.equipment = _object
         end
     end,
     THROWING = function(_object)
         if not _object then return end
         if _object.type == types.Weapon and Dt.WEAPON_TYPES.THROWING[types.Weapon.record(_object).type] then
-            if not Dt.equipment then Dt.equipment = {} end
-            Dt.equipment.itemid = types.Weapon.record(_object).id
-            Dt.equipment.object = _object
+            Dt.equipment = _object
         end
     end,
 }
@@ -181,13 +178,13 @@ end
 Fn.get_weapon_data = function()
     local weapon = types.Actor.getEquipment(self, Dt.SLOTS.WEAPON)
     if not weapon then return
-    elseif     Dt.WEAPON_TYPES.MELEE[types.Weapon.record(weapon).type]    then
+    elseif Dt.WEAPON_TYPES.MELEE[types.Weapon.record(weapon).type]    then
         Dt.pc_held_weapon_condition:set_prevframe(Fn.get_equipped('MELEE').condition)
     elseif Dt.WEAPON_TYPES.BOW[types.Weapon.record(weapon).type]      then
-        Dt.pc_marksman_weapon:set_prevframe(Fn.get_equipped('BOW'))
-        if types.Actor.getEquipment(self, Dt.SLOTS.AMMO) then Dt.pc_marksman_ammo = Fn.get_equipped('AMMO') end
+        Dt.pc_bow:set_prevframe(Fn.get_equipped('BOW'))
+        if types.Actor.getEquipment(self, Dt.SLOTS.AMMO) then Dt.pc_ammo = Fn.get_equipped('AMMO') end
     elseif Dt.WEAPON_TYPES.THROWING[types.Weapon.record(weapon).type] then
-        Dt.pc_marksman_thrown = Fn.get_equipped('THROWING')
+        Dt.pc_thrown = Fn.get_equipped('THROWING')
     end
 end
 
@@ -398,20 +395,21 @@ Fn.make_scalers = function()
     for _, _skillid in ipairs(Dt.scaler_groups.MELEE_WEAPON) do
         Dt.scalers:new{ name = _skillid, 
             func = function(xp)
-
+                
+                local weapon = Fn.get_equipped('MELEE')
                 -- NOTE: We disable scaling while under the effect of Disintegrate Weapon, for you'd get ridiculous amounts of XP otherwise.
                 -- For the sake of robustness and simplicity, it's a tradeoff I'm willing to accept. I will NOT attempt to fix it.
                 if     Fn.has_effect('disintegrateweapon') then return xp
                 -- We also disable scaling if you're not holding a melee weapon when this is called.
                 -- Will never happen under normal gameplay, but some mod in the future may use such a thing, so better safe than sorry
-                elseif not Fn.get_equipped('MELEE')   then return xp 
+                elseif not weapon then return xp 
                 end
-
-                local condition_lost = Dt.pc_held_weapon_condition.prevframe - Fn.get_equipped('MELEE').condition
+                
+                local condition_lost = Dt.pc_held_weapon_condition.prevframe - weapon.condition
                 local damage = condition_lost/Dt.GMST.fWeaponDamageMult
-
+                
+                local wp_obj = weapon.object
                 -- If you have the Weapon-XP-Precision addon, we add weapon.lua to your weapon.
-                local wp_obj = Fn.get_equipped('MELEE').object
                 if has_precision_addon then 
                     core.sendGlobalEvent('SUS_addScript', {script = 'weapon.lua',obj = wp_obj})
                 -- From there we reduce/increase condition lost by the difference between the actual amount lost and what you would have lost with Vanilla * Weapon_Wear_Mult
@@ -426,7 +424,6 @@ Fn.make_scalers = function()
                 local wp = types.Weapon.record(wp_obj)
                 local min_cond_dmg = 2 / Dt.GMST.fWeaponDamageMult
                 if damage < (min_cond_dmg - 0.001) then
-                    local wp = types.Weapon.record(wp_obj)
                     local str_mod = types.Player.stats.attributes.strength(self).base * Dt.GMST.fDamageStrengthMult / 10 + Dt.GMST.fDamageStrengthBase
                     local function getMinDamage(val) return math.min(min_cond_dmg, val * str_mod) end
                     damage = ( getMinDamage(wp.chopMaxDamage  ) + getMinDamage(wp.chopMinDamage  )
@@ -440,14 +437,76 @@ Fn.make_scalers = function()
                 local skill = types.Player.stats.skills[_skillid](self).base
                 --NOTE: due to durability being an integer, this will only change in steps of 10 damage (unless you have changed your Durability GMST).
                 -- If you have the Weapon-XP-Precision addon, this increases in steps of 2.5 damage instead.
-                xp = xp * damage/wp.speed/Melee_Damage_to_XP * 80/(40 + math.min(skill, 100)) -- We use math.min here because hit rate can't go above 100, so we shouldn't scale past it.
+                xp = xp * damage/wp.speed/Weapon_Damage_to_XP * 80/(40 + math.min(skill, 100)) -- We use math.min here because hit rate can't go above 100, so we shouldn't scale past it.
 
-                print("SUS - Weapon XP Multiplier: x".. math.floor(100*damage/wp.speed/Melee_Damage_to_XP * 80/(40 + math.min(skill, 100)))/100)
+                print("SUS - Melee XP Mult: ".. math.floor(100*damage/wp.speed/Weapon_Damage_to_XP * 80/(40 + math.min(skill, 100)))/100)
 
                 return xp
             end
         }
     end
+    -- MARKSMAN Scaling
+-----------------------------------------------------------------------------------------------------------        Dt.scalers:new{ name = 'marksman', 
+    Dt.scalers:new{ name = 'marksman', 
+        func = function(xp)
+            -- Mostly the same as MELEE, but we an abridged the alternate formula for throwables and different Dt values for bows & crossbows
+            local bow    = Fn.get_equipped('BOW')
+            local ammo   = Dt.pc_ammo
+            local thrown = Dt.pc_thrown
+            local wp     = nil -- This is to set scope only.
+            local damage = nil -- This is to set scope only.
+            
+            -- Bow / Crossbow Scaler
+            if bow then
+                -- If we have a bow but don't remember the last used ammo for whatever reason, skip scaling.
+                if not ammo then print('SUS - No Ammo in Dt.pc_ammo') return xp end
+                -- If bow and disintegrate we skip. Note we DON'T skip throwables, only bows/crossbows.
+                -- Throwables don't care about durability, nor disintegrate whatever.
+                if Fn.has_effect('disintegrateweapon') then return xp end 
+                
+                local condition_lost = Dt.pc_bow.prevframe.condition - bow.condition
+                damage = condition_lost/Dt.GMST.fWeaponDamageMult
+                
+                local wp_obj = bow.object
+                wp = types.Weapon.record(wp_obj)
+                -- If you have the Weapon-XP-Precision addon, we add weapon.lua to your weapon.
+                if has_precision_addon then 
+                    core.sendGlobalEvent('SUS_addScript', {script = 'weapon.lua',obj = wp_obj})
+                    local codition_delta = - condition_lost * (Weapon_Wear_Mult/10/Dt.GMST.fWeaponDamageMult - 1)
+                    wp_obj:sendEvent('modifyCondition', codition_delta)
+                end
+                -- Alternate fromula for low damage
+                local min_cond_dmg = 2 / Dt.GMST.fWeaponDamageMult
+                if damage < (min_cond_dmg - 0.001) then
+                    local str_mod = types.Player.stats.attributes.strength(self).base * Dt.GMST.fDamageStrengthMult / 10 + Dt.GMST.fDamageStrengthBase
+                    local function getMinDamage(val) return math.min(min_cond_dmg, val * str_mod) end
+                    damage = (getMinDamage(wp.chopMaxDamage) + getMinDamage(wp.chopMinDamage)) / 6
+                end
+                
+            -- Thrown Weapon Scaler
+            elseif thrown then 
+                wp = types.Weapon.record(thrown)
+                local str_mod = types.Player.stats.attributes.strength(self).base * Dt.GMST.fDamageStrengthMult / 10 + Dt.GMST.fDamageStrengthBase
+                barrage_factor = 0.5 + 2 / (Fn.recent_activations('thrown', 5) /wp.speed)
+                print('Barrage Factor: '..printify(barrage_factor))
+                damage = (wp.chopMaxDamage + wp.chopMinDamage) / 3 * barrage_factor * str_mod -- /3 instead of /6 cause throwns count twice.
+            -- If we don't have a bow but somehow don't remember last throwable either, also skip.
+            else print('SUS - No Ammo in Dt.pc_ammo') return xp
+            -- If we got here, we have a valid weapon and damage number, and should apply scaling.
+            end
+
+            -- Scale XP:
+            
+            local skill = types.Player.stats.skills['marksman'](self).base
+            --NOTE: due to durability being an integer, this will only change in steps of 10 damage (unless you have changed your Durability GMST).
+            -- If you have the Weapon-XP-Precision addon, this increases in steps of 2.5 damage instead.
+            xp = xp * damage/wp.speed/Weapon_Damage_to_XP * 80/(40 + math.min(skill, 100)) -- We use math.min here because hit rate can't go above 100, so we shouldn't scale past it.
+
+            print("SUS - Marksman XP Mult: ".. math.floor(100*damage/wp.speed/Weapon_Damage_to_XP * 80/(40 + math.min(skill, 100)))/100)
+
+            return xp
+        end
+    }
     print('Scalers constructed')
 
     -- Marksman Scaling
