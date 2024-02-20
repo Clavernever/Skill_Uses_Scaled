@@ -60,7 +60,6 @@ local function makecounter(val)
     local count = val
     return function(mod)
         count = count + mod
-        print(count)
         return count
     end
 end
@@ -73,7 +72,7 @@ function getArmorType(armor_obj)
     local medMultiplier   = Dt.GMST.fMedMaxMod   + 0.0005
     local armorType       = types.Armor.record(armor_obj).type
     local weight          = types.Armor.record(armor_obj).weight
-    local armorTypeWeight = math.floor(Dt.ARMOR_SLOTS[armorType])
+    local armorTypeWeight = math.floor(Dt.ARMOR_TYPES[armorType])
     if     weight <= armorTypeWeight * lightMultiplier then -- print("SKILL: lightarmor")
         return 'lightarmor'
     elseif weight <= armorTypeWeight * medMultiplier   then -- print("SKILL: mediumarmor")
@@ -124,20 +123,76 @@ Fn.get_equipped_armor = function()
     return armor_list
 end
 
-Fn.get_equipped_weapon = function() --Returns a table with three values: the object, it's id and it's current condition
-    local weapon = {itemid = 'id Not Assigned', object = 'object Not Assigned', condition = 0}
-    for _, _object in ipairs(types.Actor.inventory(self):getAll(types.Weapon)) do
-        if types.Actor.hasEquipped(self, _object) then
-            weapon.itemid = types.Weapon.record(_object).id
-            weapon.condition = types.Item.itemData(_object).condition
-            weapon.object = _object
+Fn.getters = {
+    ARMOR = function(_object)
+        if not _object then return end
+        if _object.type == types.Armor then
+            if not Dt.equipment then Dt.equipment = {} end
+            table.insert(Dt.equipment, _object)
         end
+    end,
+    MELEE = function(_object)
+        if not _object then return end
+        if _object.type == types.Weapon and Dt.WEAPON_TYPES.MELEE[types.Weapon.record(_object).type]    then
+            if not Dt.equipment then Dt.equipment = {} end
+            Dt.equipment.itemid = types.Weapon.record(_object).id
+            Dt.equipment.condition = types.Item.itemData(_object).condition
+            Dt.equipment.object = _object
+        end
+    end,
+    BOW = function(_object)
+        if not _object then return end
+        if _object.type == types.Weapon and Dt.WEAPON_TYPES.BOW[types.Weapon.record(_object).type]      then
+            if not Dt.equipment then Dt.equipment = {} end
+            Dt.equipment.itemid = types.Weapon.record(_object).id
+            Dt.equipment.condition = types.Item.itemData(_object).condition
+            Dt.equipment.object = _object
+        end
+    end,
+    AMMO = function(_object)
+        if not _object then return end
+        if _object.type == types.Weapon and Dt.WEAPON_TYPES.AMMO[types.Weapon.record(_object).type]     then
+            if not Dt.equipment then Dt.equipment = {} end
+            Dt.equipment.itemid = types.Weapon.record(_object).id
+            Dt.equipment.object = _object
+        end
+    end,
+    THROWING = function(_object)
+        if not _object then return end
+        if _object.type == types.Weapon and Dt.WEAPON_TYPES.THROWING[types.Weapon.record(_object).type] then
+            if not Dt.equipment then Dt.equipment = {} end
+            Dt.equipment.itemid = types.Weapon.record(_object).id
+            Dt.equipment.object = _object
+        end
+    end,
+}
+
+Fn.get_equipped = function(TYPEenum) --Returns a table with three values: the object, it's id and it's current condition
+    Dt.equipment = nil
+    local getter = Fn.getters[TYPEenum]
+    if type(Dt.SLOTS[TYPEenum]) == 'table' then equipment_type = Dt.SLOTS[TYPEenum]
+    else equipment_type = {Dt.SLOTS[TYPEenum]} end -- if not table, make table for ipairs
+    for _, _slot in ipairs(equipment_type) do
+        getter(types.Actor.getEquipment(self, _slot))
     end
-    return weapon
+    return Dt.equipment
+end
+
+Fn.get_weapon_data = function()
+    local weapon = types.Actor.getEquipment(self, Dt.SLOTS.WEAPON)
+    if not weapon then return
+    elseif     Dt.WEAPON_TYPES.MELEE[types.Weapon.record(weapon).type]    then
+        Dt.pc_held_weapon_condition:set_prevframe(Fn.get_equipped('MELEE').condition)
+    elseif Dt.WEAPON_TYPES.BOW[types.Weapon.record(weapon).type]      then
+        Dt.pc_marksman_weapon:set_prevframe(Fn.get_equipped('BOW'))
+        if types.Actor.getEquipment(self, Dt.SLOTS.AMMO) then Dt.pc_marksman_ammo = Fn.get_equipped('AMMO') end
+    elseif Dt.WEAPON_TYPES.THROWING[types.Weapon.record(weapon).type] then
+        Dt.pc_marksman_thrown = Fn.get_equipped('THROWING')
+    end
 end
 
 Fn.get_hit_armorpiece = function()
-    for _, _obj in ipairs(Fn.get_equipped_armor()) do
+    for _, _obj in ipairs(Fn.get_equipped('ARMOR')) do
         local slot = types.Armor.record(_obj).type
         if not equal(Dt.pc_equipped_armor_condition.prevframe[slot], types.Item.itemData(_obj).condition) then return _obj end
     end
@@ -159,19 +214,19 @@ end
 Fn.get_AR = function()
     local skill       = 0
     local rating      = 0
-    local armor_slots = get(Dt.ARMOR_SLOTS) -- We copy this table. We could have copied ARMOR_RATING_WEIGHTS too, all that matters is that it includes all slots.
+    local armor_types = get(Dt.ARMOR_TYPES) -- We copy this table. We could have copied ARMOR_RATING_WEIGHTS too, all that matters is that it includes all slots.
     local clean_slots = function(_slot) -- This is to guarantee we don't get ghost unarmored slots for gauntlets and bracers
         if     _slot == types.Armor.TYPE.LBracer or _slot == types.Armor.TYPE.LGauntlet then
-            armor_slots[types.Armor.TYPE.LBracer  ] = nil
-            armor_slots[types.Armor.TYPE.LGauntlet] = nil
+            armor_types[types.Armor.TYPE.LBracer  ] = nil
+            armor_types[types.Armor.TYPE.LGauntlet] = nil
         elseif _slot == types.Armor.TYPE.RBracer or _slot == types.Armor.TYPE.RGauntlet then
-            armor_slots[types.Armor.TYPE.RBracer  ] = nil
-            armor_slots[types.Armor.TYPE.RGauntlet] = nil
-        else armor_slots[_slot] = nil
+            armor_types[types.Armor.TYPE.RBracer  ] = nil
+            armor_types[types.Armor.TYPE.RGauntlet] = nil
+        else armor_types[_slot] = nil
         end
     end
     -- Add AR from all slots with armor
-    for _, _obj in ipairs(Fn.get_equipped_armor()) do
+    for _, _obj in ipairs(Fn.get_equipped('ARMOR')) do
         skill  = types.Player.stats.skills[getArmorType(_obj)](self).modified
         local slot   = types.Armor.record(_obj).type
         local hp_mod = types.Item.itemData(_obj).condition / types.Armor.record(_obj).health
@@ -179,7 +234,7 @@ Fn.get_AR = function()
         clean_slots(slot)
     end
     -- Add AR for slots that didn't have armor
-    for _slot, _ in pairs(armor_slots) do
+    for _slot, _ in pairs(armor_types) do
         skill = types.Player.stats.skills.unarmored(self).modified
         rating = rating + skill * Dt.GMST.fUnarmoredBase1 * skill * Dt.GMST.fUnarmoredBase2 * Dt.ARMOR_RATING_WEIGHTS[_slot]-- Why have 2 GMSTs for 1 number? Precision? Yeah precision I guess.
         clean_slots(_slot)
@@ -189,24 +244,24 @@ Fn.get_AR = function()
 end
 
 Fn.get_unarmored_slots = function()
-    local armor_slots = get(Dt.ARMOR_SLOTS) -- We copy this table. We could have copied ARMOR_RATING_WEIGHTS too, all that matters is that it includes all slots.
+    local armor_types = get(Dt.ARMOR_TYPES) -- We copy this table. We could have copied ARMOR_RATING_WEIGHTS too, all that matters is that it includes all slots.
     local clean_slots = function(_slot) -- This is to guarantee we don't get ghost unarmored slots for gauntlets and bracers
         if     _slot == types.Armor.TYPE.LBracer or _slot == types.Armor.TYPE.LGauntlet then
-            armor_slots[types.Armor.TYPE.LBracer  ] = nil
-            armor_slots[types.Armor.TYPE.LGauntlet] = nil
+            armor_types[types.Armor.TYPE.LBracer  ] = nil
+            armor_types[types.Armor.TYPE.LGauntlet] = nil
         elseif _slot == types.Armor.TYPE.RBracer or _slot == types.Armor.TYPE.RGauntlet then
-            armor_slots[types.Armor.TYPE.RBracer  ] = nil
-            armor_slots[types.Armor.TYPE.RGauntlet] = nil
-        else armor_slots[_slot] = nil
+            armor_types[types.Armor.TYPE.RBracer  ] = nil
+            armor_types[types.Armor.TYPE.RGauntlet] = nil
+        else armor_types[_slot] = nil
         end
     end
     -- Remove all slots with armor from the list
-    for _, _obj in ipairs(Fn.get_equipped_armor()) do
+    for _, _obj in ipairs(Fn.get_equipped('ARMOR')) do
         clean_slots(types.Armor.record(_obj).type)
     end
     local unarmored_slots = {}
     -- Add slots that didn't have armor to this new iterable, #ble table
-    for _slot, _ in pairs(armor_slots) do
+    for _slot, _ in pairs(armor_types) do
         table.insert(unarmored_slots, _slot)
     end
     return unarmored_slots
@@ -221,25 +276,6 @@ Fn.recent_activations = function(source, simtime)
     return Dt.recent_activations[source].counter(1)
 end
 
--- Fn.get_marksman_weapon = function() --Returns a table with three values: the object, it's id and it's current condition
---     local weapon = {itemid = 'id Not Assigned', object = 'object Not Assigned', condition = 0}
---     for _, _object in ipairs(types.Actor.inventory(self):getAll(types.Weapon)) do
---         if types.Actor.hasEquipped(self, _object) then
---             if (types.Weapon.record(_object).type == types.Weapon.TYPE.Arrow) or (types.Weapon.record(_object).type == types.Weapon.TYPE.Bolt) then
---                 Dt.pc_marksman_projectile.itemid = types.Weapon.record(_object).id
---                 Dt.pc_marksman_projectile.object = _object
---             elseif (types.Weapon.record(_object).type == types.Weapon.TYPE.MarksmanCrossbow) or (types.Weapon.record(_object).type == types.Weapon.TYPE.MarksmanBow) then
---                 weapon.itemid = types.Weapon.record(_object).id
---                 weapon.condition = types.Item.itemData(_object).condition
---                 weapon.object = _object
---             elseif types.Weapon.record(_object).type == types.Weapon.TYPE.MarksmanThrown then
---             end
---         end
---     end
---     return weapon
--- end
-
-
 Fn.make_scalers = function()
 
     -- ARMOR Scaling
@@ -251,8 +287,9 @@ Fn.make_scalers = function()
                 -- NOTE: We disable scaling while under the effect of Disintegrate Armor, for you'd get ridiculous amounts of XP otherwise.
                 -- For the sake of robustness and simplicity, it's a tradeoff I'm willing to accept. I will NOT attempt to fix it.
                 if Fn.has_effect('disintegratearmor') then return xp end
-
                 local armor_obj = Fn.get_hit_armorpiece()
+                if not armor_obj then return xp end -- If we didn't find a hit piece, we skip scaling and leave XP vanilla. It's an edge case not worth pursuing.
+
                 -- We estimate incoming damage from AR and condition lost instead of directly using condition lost.
                 -- This helps avoid low ARs becoming a pit of neverleveling.
                 local condition_lost = Dt.pc_equipped_armor_condition.prevframe[types.Armor.record(armor_obj).type] - types.Item.itemData(armor_obj).condition
@@ -276,11 +313,11 @@ Fn.make_scalers = function()
             -- NOTE: We disable scaling while under the effect of Disintegrate Armor, for you'd get ridiculous amounts of XP otherwise.
             -- For the sake of robustness and simplicity, it's a tradeoff I'm willing to accept. I will NOT attempt to fix it.
             if Fn.has_effect('disintegratearmor') then return xp end
-
-            local armor_obj = Fn.get_hit_armorpiece()
-            -- We estimate incoming damage from AR and condition lost instead of directly using condition lost.
-            -- This helps avoid low ARs becoming a pit of neverleveling.
-            local condition_lost = Dt.pc_equipped_armor_condition.prevframe[types.Armor.record(armor_obj).type] - types.Item.itemData(armor_obj).condition
+            local armor_obj = types.Actor.getEquipment(self, Dt.SLOTS.SHIELD)
+            local current_shield_condition = 0 -- if armor_obj is nill, because the shield was broken and unequipped, then we count condition as 0.
+            -- With armor the likelyhood of breaking is low, so we're better off just returning xp, but here we should air on the side of scaling the edge case rather than ignoring it.
+            if armor_obj then current_shield_condition = types.Item.itemData(armor_obj).condition end
+            local condition_lost = Dt.pc_equipped_armor_condition.prevframe[types.Armor.record(armor_obj).type] - current_shield_condition
             local damage = condition_lost
             -- Armor skill and AR GMSTs are combined to make leveling below base AR faster, and above slower.
             local skill = types.Player.stats.skills.block(self).base
@@ -301,7 +338,7 @@ Fn.make_scalers = function()
 
             local dodge_factor  = 1 + 0.01 * (Fn.get_active_effect_mag('sanctuary') + 0.2*types.Player.stats.attributes.agility(self).modified + 0.1*types.Player.stats.attributes.luck(self).modified)
             local armor_weight = 0
-            for _, _obj in ipairs(Fn.get_equipped_armor()) do armor_weight = armor_weight + types.Armor.record(_obj).weight end
+            for _, _obj in ipairs(Fn.get_equipped('ARMOR')) do armor_weight = armor_weight + types.Armor.record(_obj).weight end
             local race         = get_val(types.Player.record(self).race)
             local beast_factor = 1 -- If you have more than 3 empty slots, this will stay a 1 and not affect your XP rates, even if you are Argonian/Khajiit
             if #Fn.get_unarmored_slots() <= 3 and (race == 'argonian' or race == 'khajiit') then beast_factor = Unarmored_Beast_Races / #Fn.get_unarmored_slots() end
@@ -335,7 +372,7 @@ Fn.make_scalers = function()
                 -- MP Refund:
                                             -- Calculate factors
                 local armor_weight = 0
-                for _, _obj in ipairs(Fn.get_equipped_armor()) do armor_weight = armor_weight + types.Armor.record(_obj).weight end
+                for _, _obj in ipairs(Fn.get_equipped('ARMOR')) do armor_weight = armor_weight + types.Armor.record(_obj).weight end
                 local armor_offset = armor_weight * MP_Refund_Armor_Mult
                 local cost_factor = Magicka_to_XP / (Magicka_to_XP + spell_cost/Magicka_to_XP)
                 local skill = types.Player.stats.skills[_skillid](self).base
@@ -364,12 +401,17 @@ Fn.make_scalers = function()
 
                 -- NOTE: We disable scaling while under the effect of Disintegrate Weapon, for you'd get ridiculous amounts of XP otherwise.
                 -- For the sake of robustness and simplicity, it's a tradeoff I'm willing to accept. I will NOT attempt to fix it.
-                if Fn.has_effect('disintegrateweapon') then return xp end
-                local condition_lost = Dt.pc_held_weapon_condition.prevframe - Fn.get_equipped_weapon().condition
+                if     Fn.has_effect('disintegrateweapon') then return xp
+                -- We also disable scaling if you're not holding a melee weapon when this is called.
+                -- Will never happen under normal gameplay, but some mod in the future may use such a thing, so better safe than sorry
+                elseif not Fn.get_equipped('MELEE')   then return xp 
+                end
+
+                local condition_lost = Dt.pc_held_weapon_condition.prevframe - Fn.get_equipped('MELEE').condition
                 local damage = condition_lost/Dt.GMST.fWeaponDamageMult
 
                 -- If you have the Weapon-XP-Precision addon, we add weapon.lua to your weapon.
-                local wp_obj = Fn.get_equipped_weapon().object
+                local wp_obj = Fn.get_equipped('MELEE').object
                 if has_precision_addon then 
                     core.sendGlobalEvent('SUS_addScript', {script = 'weapon.lua',obj = wp_obj})
                 -- From there we reduce/increase condition lost by the difference between the actual amount lost and what you would have lost with Vanilla * Weapon_Wear_Mult

@@ -16,15 +16,18 @@ onActive = function()
         end
     end)
 end
-onUpdate = function(dt)
-    if types.Actor.STANCE.Weapon == types.Actor.getStance(self) then
-        Dt.pc_held_weapon_condition:set_prevframe(Fn.get_equipped_weapon().condition)
+local weapontype = nil
+local onUpdate = function(dt)
+    if Dt.STANCE_WEAPON[types.Actor.getStance(self)] then
+        Fn.get_weapon_data()
     end
     local slot = 0
     local equipped_armor_thisframe = {}
-    for _, _obj in ipairs(Fn.get_equipped_armor()) do
-        slot = types.Armor.record(_obj).type
-        equipped_armor_thisframe[slot] = types.Item.itemData(_obj).condition
+    local armor = Fn.get_equipped('ARMOR')
+    if armor then
+        for _, _obj in ipairs(armor) do
+            equipped_armor_thisframe[types.Armor.record(_obj).type] = types.Item.itemData(_obj).condition
+        end
     end
     Dt.pc_equipped_armor_condition:set_prevframe(equipped_armor_thisframe)
 end

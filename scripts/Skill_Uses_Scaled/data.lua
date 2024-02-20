@@ -11,11 +11,19 @@ return result
 end
 
 setpreviousval = function(key, val)
-    local oldval = false
+    local oldval = val
     return function(self, newval)
-        oldval = val
-        val = newval
         self[key] = oldval
+        oldval = newval
+    end
+end
+
+local function get(var) -- var must be serializable, recursions WILL stack overflow :D
+    if type(var)  ~= 'table' then return var
+    else
+        local deepcopy = {}
+        for _key, _value in pairs(var) do deepcopy[_key] = get(_value) end
+        return deepcopy
     end
 end
 
@@ -25,11 +33,55 @@ local Dt = {
     pc_equipped_armor_condition = {set_prevframe = setpreviousval('prevframe', {}) },
     pc_held_weapon_condition    = {set_prevframe = setpreviousval('prevframe', 0) },
     pc_marksman_weapon          = {set_prevframe = setpreviousval('prevframe', {itemid = 'id Not Assigned', object = 'object Not Assigned', condition = 0}), },
-    pc_marksman_projectile      = {count = 0 ,itemid = 'id Not Assigned', object = 'object Not Assigned'},
+    pc_marksman_ammo    = '_obj', --Always points directly at an object.
+    pc_marksman_thrown  = '_obj', --Same as ammo, but we keep track separately because they can be simultaneously equipped (even though thrown weapons are always their own ammo)
     pc_level = 0,
 -- Engine Data
-    --ARMOR_SLOTS = {'Cuirass', 'Greaves', 'Helmet', 'LeftGauntlet', 'LeftPauldron', 'RightGauntlet', 'RightPauldron'}
-    ARMOR_SLOTS = {
+    WEAPON_TYPES = {
+        MELEE = {
+            [types.Weapon.TYPE.AxeOneHand       ] = 'axe'        ,
+            [types.Weapon.TYPE.AxeTwoHand       ] = 'axe'        ,
+            [types.Weapon.TYPE.BluntOneHand     ] = 'bluntweapon',
+            [types.Weapon.TYPE.BluntTwoClose    ] = 'bluntweapon',
+            [types.Weapon.TYPE.BluntTwoWide     ] = 'bluntweapon',
+            [types.Weapon.TYPE.LongBladeOneHand ] = 'longblade'  ,
+            [types.Weapon.TYPE.LongBladeTwoHand ] = 'longblade'  ,
+            [types.Weapon.TYPE.ShortBladeOneHand] = 'shortblade' ,
+            [types.Weapon.TYPE.SpearTwoWide     ] = 'spear'      ,
+        },
+        BOW = {
+            [types.Weapon.TYPE.MarksmanBow      ] = 'marksman'   ,
+            [types.Weapon.TYPE.MarksmanCrossbow ] = 'marksman'   ,
+        },
+        AMMO = {
+            [types.Weapon.TYPE.Bolt             ] = 'marksman'   ,
+            [types.Weapon.TYPE.Arrow            ] = 'marksman'   ,
+        },
+        THROWING = {
+            [types.Weapon.TYPE.MarksmanThrown   ] = 'marksman'   ,
+        },
+    },
+    -- CHECK TYPE WHEN USING THESE, THEY CAN HAVE THINGS OF OTHER TYPES
+    SLOTS = {
+        WEAPON   = get(types.Actor.EQUIPMENT_SLOT.CarriedRight),
+        MELEE    = get(types.Actor.EQUIPMENT_SLOT.CarriedRight),
+        BOW      = get(types.Actor.EQUIPMENT_SLOT.CarriedRight),
+        THROWING = get(types.Actor.EQUIPMENT_SLOT.CarriedRight),
+        AMMO     = get(types.Actor.EQUIPMENT_SLOT.Ammunition  ),
+        SHIELD   = get(types.Actor.EQUIPMENT_SLOT.CarriedLeft ),
+        ARMOR    = { 
+            get(types.Actor.EQUIPMENT_SLOT.Boots        ),
+            get(types.Actor.EQUIPMENT_SLOT.CarriedLeft  ),
+            get(types.Actor.EQUIPMENT_SLOT.Cuirass      ),
+            get(types.Actor.EQUIPMENT_SLOT.Greaves      ),
+            get(types.Actor.EQUIPMENT_SLOT.Helmet       ),
+            get(types.Actor.EQUIPMENT_SLOT.LeftGauntlet ),
+            get(types.Actor.EQUIPMENT_SLOT.LeftPauldron ),
+            get(types.Actor.EQUIPMENT_SLOT.RightGauntlet),
+            get(types.Actor.EQUIPMENT_SLOT.RightPauldron),
+        },
+    },
+    ARMOR_TYPES = {
         [types.Armor.TYPE.Boots    ] = core.getGMST('iBootsWeight'   ),
         [types.Armor.TYPE.Cuirass  ] = core.getGMST('iCuirassWeight' ),
         [types.Armor.TYPE.Greaves  ] = core.getGMST('iGreavesWeight' ),
@@ -42,7 +94,7 @@ local Dt = {
         [types.Armor.TYPE.RPauldron] = core.getGMST('iPauldronWeight'),
         [types.Armor.TYPE.Shield   ] = core.getGMST('iShieldWeight'  ),
     },
-    ARMOR_SLOT_NAMES = {
+    ARMOR_TYPE_NAMES = { -- unused at the moment
         [types.Armor.TYPE.Boots    ] = 'Boots',
         [types.Armor.TYPE.Cuirass  ] = 'Cuirass',
         [types.Armor.TYPE.Greaves  ] = 'Greaves',
@@ -92,7 +144,9 @@ local Dt = {
         MELEE_WEAPON = {'axe', 'bluntweapon', 'longblade', 'shortblade', 'spear'}, -- !! Weapon health gets reduced by *net* damage dealt.
         ARMOR        = {'heavyarmor', 'lightarmor', 'mediumarmor'}, -- !! Armor health gets reduced by the amount of incoming damage it *blocked*.
     },
-    STANCES = {nothing = 0, magic = 1, physical  = 2},
+    STANCE_WEAPON  = {[types.Actor.STANCE.Weapon ] = true},
+    STANCE_SPELL   = {[types.Actor.STANCE.Spell  ] = true},
+    STANCE_NOTHING = {[types.Actor.STANCE.Nothing] = true},
     scalers = {
         default = {func = function(xp) return xp end},
         new = function(self, t) end-- t = {name = skillid, func = function(xp) dosomething return xp end}
@@ -100,6 +154,7 @@ local Dt = {
     -- SCRIPT LOGIC VARIABLES
     has_precision_addon = false,
     recent_activations = {},
+    equipment = nil
 }
 
 --[] Setup metatable inheritance for Dt.scalers || DOESNT WORK AND I DONT KNOW WHY
