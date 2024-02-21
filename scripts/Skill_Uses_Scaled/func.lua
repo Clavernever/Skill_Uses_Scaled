@@ -310,7 +310,7 @@ Fn.estimate_base_damage = function(t) --{full = 0, spam = 0, speed = 0, min = 0,
     local draw = math.min(1, math.max(0, (t.spam - t.speed)/(t.spam - t.full))) -- Now we get draw% (normalised from 0 to 1)
     local damage = t.min + (t.max - t.min) * draw
 --     print(printify(t.speed)..' | '..printify(draw))
-    return damagedad
+    return damage
 end
 Fn.make_scalers = function()
 
@@ -479,12 +479,17 @@ Fn.make_scalers = function()
                     local str_mod = types.Player.stats.attributes.strength(self).base * Dt.GMST.fDamageStrengthMult / 10 + Dt.GMST.fDamageStrengthBase
                     local condition_mod = weapon.condition/types.Weapon.record(wp_obj).health
                     local function getMinDamage(val) return math.max(1, math.min(min_cond_dmg, val * str_mod * condition_mod)) end
-                    local mindamage = (getMinDamage(wp.chopMinDamage) + getMinDamage(wp.slashMinDamage) + getMinDamage(wp.thrustMinDamage))/3
-                    local maxdamage = (getMinDamage(wp.chopMaxDamage) + getMinDamage(wp.thrustMaxDamage) + getMinDamage(wp.slashMaxDamage))/3
+                    local function getBestAttack(_obj)
+                        local best = wp.chopMaxDamage
+                        local atk  = 'chop'
+                        if     best < wp.slashMaxDamage  then best = wp.slashMaxDamage  atk = 'slash'
+                        elseif best < wp.thrustMaxDamage then best = wp.thrustMaxDamage atk = 'thrust' end
+                        return wp[atk..'MinDamage'], wp[atk..'MaxDamage']
+                    end
+                    local mindamage, maxdamage = getBestAttack(weapon.object)
                     damage = Fn.estimate_base_damage{speed = Dt.attackspeed.current, full = 0.85*speed_factor, spam = 1.45*speed_factor,
                                                      min = getMinDamage(mindamage), max = getMinDamage(maxdamage)}
                 end
-
                 -- Scale XP:
 
                 local skill = types.Player.stats.skills[_skillid](self).base
