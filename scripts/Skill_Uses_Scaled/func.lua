@@ -2,6 +2,7 @@ local core  = require('openmw.core')
 local self  = require('openmw.self')
 local types = require('openmw.types')
 local async = require('openmw.async')
+local time  = require('openmw_aux.time')
 
 local Dt = require('scripts.Skill_Uses_Scaled.data')
 
@@ -58,9 +59,11 @@ end
 
 local function makecounter(val)
     local count = val
+--     local simseconds = function() return core.getSimulationTime() - (core.getSimulationTime() % time.second) end
+--     local start = simseconds() -- for debugging
     return function(mod)
         count = count + mod
-        print(count)
+--         print('Count: '..count .. ' | Time: '..(simseconds() - start)) --- core.getGameTime() % time.second - start)
         return count
     end
 end
@@ -159,7 +162,9 @@ Fn.getters = {
     THROWING = function(_object)
         if not _object then return end
         if _object.type == types.Weapon and Dt.WEAPON_TYPES.THROWING[types.Weapon.record(_object).type] then
-            Dt.equipment = _object
+            if not Dt.equipment then Dt.equipment = {} end
+            Dt.equipment.object = _object
+            Dt.equipment.count  = _object.count
         end
     end,
 }
@@ -184,7 +189,12 @@ Fn.get_weapon_data = function()
         Dt.pc_bow:set_prevframe(Fn.get_equipped('BOW'))
         if types.Actor.getEquipment(self, Dt.SLOTS.AMMO) then Dt.pc_ammo = Fn.get_equipped('AMMO') end
     elseif Dt.WEAPON_TYPES.THROWING[types.Weapon.record(weapon).type] then
-        Dt.pc_thrown = Fn.get_equipped('THROWING')
+        local new = Fn.get_equipped('THROWING')
+        Dt.pc_thrown.object = new.object
+        Dt.pc_thrown:set_prevcount(new.count)
+        if new.count < Dt.pc_thrown.prevcount then
+            Fn.recent_activations(1, 'thrown', 9.5)
+        end
     end
 end
 
@@ -264,13 +274,13 @@ Fn.get_unarmored_slots = function()
     return unarmored_slots
 end
 
-Fn.recent_activations = function(source, simtime)
+Fn.recent_activations = function(amount, source, simtime)
     if not Dt.recent_activations[source] then
         Dt.recent_activations[source] = {callback = source, counter = makecounter(0)}
         Dt.recent_activations[source].callback = async:registerTimerCallback(Dt.recent_activations[source].callback, Dt.recent_activations[source].counter)
     end
-    async:newSimulationTimer(simtime, Dt.recent_activations[source].callback, -1)
-    return Dt.recent_activations[source].counter(1)
+    async:newSimulationTimer(simtime, Dt.recent_activations[source].callback, -amount)
+    return Dt.recent_activations[source].counter(amount)
 end
 
 Fn.make_scalers = function()
@@ -339,7 +349,7 @@ Fn.make_scalers = function()
             local race         = get_val(types.Player.record(self).race)
             local beast_factor = 1 -- If you have more than 3 empty slots, this will stay a 1 and not affect your XP rates, even if you are Argonian/Khajiit
             if #Fn.get_unarmored_slots() <= 3 and (race == 'argonian' or race == 'khajiit') then beast_factor = Unarmored_Beast_Races / #Fn.get_unarmored_slots() end
-            local gank_factor  = Unarmored_Hits_To_XP / Fn.recent_activations('unarmored', Unarmored_Hit_Timer)
+            local gank_factor  = Unarmored_Hits_To_XP / Fn.recent_activations(1, 'unarmored', Unarmored_Hit_Timer)
             local skill        = types.Player.stats.skills['unarmored'](self).base
             local rating       = skill * Dt.GMST.fUnarmoredBase1 * skill * Dt.GMST.fUnarmoredBase2
             local skill_factor = 100 / (35 + rating + skill + armor_weight * Unarmored_Armor_Mult)
@@ -452,7 +462,7 @@ Fn.make_scalers = function()
             -- Mostly the same as MELEE, but we an abridged the alternate formula for throwables and different Dt values for bows & crossbows
             local bow    = Fn.get_equipped('BOW')
             local ammo   = Dt.pc_ammo
-            local thrown = Dt.pc_thrown
+            local thrown = Dt.pc_thrown.object
             local wp     = nil -- This is to set scope only.
             local damage = nil -- This is to set scope only.
             
@@ -487,9 +497,22 @@ Fn.make_scalers = function()
             elseif thrown then 
                 wp = types.Weapon.record(thrown)
                 local str_mod = types.Player.stats.attributes.strength(self).base * Dt.GMST.fDamageStrengthMult / 10 + Dt.GMST.fDamageStrengthBase
-                barrage_factor = 0.5 + 2 / (Fn.recent_activations('thrown', 5) /wp.speed)
-                print('Barrage Factor: '..printify(barrage_factor))
-                damage = (wp.chopMaxDamage + wp.chopMinDamage) / 3 * barrage_factor * str_mod -- /3 instead of /6 cause throwns count twice.
+                local attack_count = Dt.recent_activations.thrown.counter(0)
+                -- According to my testing, in 9 seconds you can get off ~12 attacks at full spam, and up to 8 while fully charging. We use these two numbers to do our magic.
+                -- If count under 7, you either just started attacking with a throuwn weapon, or stopped for a moment.
+                -- We make a callback staircase with increasing timers, bumping count up to the full-drawn attack speed
+                -- If you're full-drawing then attack_count will hover over 8,but if you start spamming it will quickly go up to 12-14
+                if attack_count <= 7 then for i=1, 8 - math.floor(attack_count) do Fn.recent_activations(1, 'thrown', i + 0.5) end end
+                -- As combat goes, this number will aproximate your actual attack speed, and from that we infer whether you're fully drawing your weapon or not.
+                attack_count = math.max(7.9, Dt.recent_activations.thrown.counter(0)) -- We clamp at 7.9 attacks per 9s, since that's the fastest full drawn attackspeed you can manage.
+                -- Now we use our makeshift attack draw estimation to (hopefully) get your damage (mostly) right.
+                damage = wp.chopMinDamage + (wp.chopMaxDamage - wp.chopMinDamage) * math.max(0, 12 - attack_count)/4
+                damage = damage * str_mod -- Gotta account for chonk stronk
+                print(wp.chopMinDamage    ..' | '.. wp.chopMaxDamage)
+                print(wp.slashMinDamage   ..' | '.. wp.slashMaxDamage)
+                print(wp.thrustMinDamage  ..' | '.. wp.thrustMaxDamage)
+                print(Dt.recent_activations.thrown.counter(0))
+                print('SUS - Throwing Damage: '..printify(damage))
             -- If we don't have a bow but somehow don't remember last throwable either, also skip.
             else print('SUS - No Ammo in Dt.pc_ammo') return xp
             -- If we got here, we have a valid weapon and damage number, and should apply scaling.
