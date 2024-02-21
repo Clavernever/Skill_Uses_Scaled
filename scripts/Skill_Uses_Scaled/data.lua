@@ -1,4 +1,5 @@
 local types = require('openmw.types')
+local time  = require('openmw_aux.time')
 local core  = require('openmw.core')
 
 -- TOOLS
@@ -10,11 +11,26 @@ end
 return result
 end
 
-setpreviousval = function(key, val)
+local function setpreviousval(key, val)
     local oldval = val
     return function(self, newval)
         self[key] = oldval
         oldval = newval
+    end
+end
+
+local function printify(num) return math.floor(num*100 + 0.5)/100 end
+local function make_atkspeed_meter()
+    local simseconds = function() return core.getSimulationTime() - (core.getSimulationTime() % 0.01 * time.second) end
+    local last    = simseconds()
+    local current = simseconds()
+    local atkspd  = 0
+    return function()
+        current = simseconds()
+        print('Attackspeed: '.. printify(1/(current - last))) --- core.getGameTime() % time.second - start)
+        atkspd = 1/(current - last)
+        last = current
+        return atkspd
     end
 end
 
@@ -31,10 +47,10 @@ local Dt = {
 -- Player Data
     pc_held_spell = 'spellid',
     pc_equipped_armor_condition = {set_prevframe = setpreviousval('prevframe', {}) },
-    pc_held_weapon_condition    = {set_prevframe = setpreviousval('prevframe', 0) },
-    pc_bow    = {set_prevframe = setpreviousval('prevframe', {itemid = '_id', object = '_obj', condition = 0}), },
+    pc_held_weapon_condition    = 0,  --{set_prevframe = setpreviousval('prevframe', 0) },
+    pc_bow    = {itemid = '_id', object = '_obj', condition = 0}, --{set_prevframe = setpreviousval('prevframe', {itemid = '_id', object = '_obj', condition = 0}), },
     pc_ammo   = '_obj', --Always points directly at an object. -- Currently unused, since bow/crossbow durability loss includes ammo damage.
-    pc_thrown = {set_prevcount = setpreviousval('prevcount', 0), object = 'obj'}, --Same as ammo, but we keep track separately because they can be simultaneously equipped (even though thrown weapons are always their own ammo)
+    pc_thrown = '_obj', --Same as ammo, but we keep track separately because they can be simultaneously equipped (even though thrown weapons are always their own ammo)
     pc_level = 0,
 -- Engine Data
     WEAPON_TYPES = {
@@ -154,7 +170,8 @@ local Dt = {
     -- SCRIPT LOGIC VARIABLES
     has_precision_addon = false,
     recent_activations = {},
-    equipment = nil
+    attackspeed = {current = 0, update = function(self) self.current = self.meter() end, meter = make_atkspeed_meter()},
+    equipment = nil,
 }
 
 --[] Setup metatable inheritance for Dt.scalers || DOESNT WORK AND I DONT KNOW WHY

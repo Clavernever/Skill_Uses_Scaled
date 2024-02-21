@@ -3,34 +3,40 @@ local self  = require('openmw.self')
 local types = require('openmw.types')
 local async = require('openmw.async')
 local time  = require('openmw_aux.time')
+local i_UI  = require('openmw.interfaces').UI
+local input = require('openmw.input')
 
 local Dt = require('scripts.Skill_Uses_Scaled.data')
 
 -- SETTINGS -- They are all flat multipliers
 -----------------------------------------------------------------------------------------------------------
-local Magicka_to_XP          =  9 -- This much magicka is equivalent to one vanilla spellcast.
+local Magicka_to_XP          =  9 -- [This] much magicka is equivalent to one vanilla spellcast.
 
-local MP_Refund_Skill_Offset = 15 -- This much magic skill is deducted on refund calculation.
+local MP_Refund_Skill_Offset = 15 -- [This] much magic skill is deducted on refund calculation.
                                   -- | The resulting skill value CAN BE NEGATIVE, and you'll get EXTRA COST instead of a refund.
-local MP_Refund_Armor_Mult  = 0.5 -- This number times your Armor Weight is added to your Skill Offset.
-local MP_Refund_Max_Percent = 50  -- Refund will never go above this Percentage of spell cost. I strongly advice you never set this above 100.
+local MP_Refund_Armor_Mult  = 0.5 -- [This] number times your Armor Weight is added to your Skill Offset.
+local MP_Refund_Max_Percent = 50  -- Refund will never go above [this] Percentage of spell cost. I strongly advice you never set [this] above [100].
                                   -- | Due to how offsets work, this also affects penalties from heavy armor.
 
-local Unarmored_Armor_Mult  = 0.5 -- This number times your Armor Weight is added to your Unarmored Skill when calculating XP.
+local Unarmored_Armor_Mult  = 0.5 -- [This] number times your Armor Weight is added to your Unarmored Skill when calculating XP.
                                   -- | Note that since skills level slower the higher they get, lighter / no armor will always result in better XP rates.
-local Unarmored_Hits_To_XP  = 3   -- Unarmored XP is multiplied by this number divied by how many times you got hit by physical attacks in the last [Unarmored_Hit_Timer] seconds.
-local Unarmored_Hit_Timer   = 60  -- How much time has to pass for a hit to no longer affect Unarmored XP, in seconds.
-local Unarmored_Beast_Races = 6   -- Unarmored levels this times faster when you're an armor-clad Argonian/Khajiit. It's for your head and feetsies.
+local Unarmored_Hits_To_XP  = 3   -- Unarmored XP is multiplied by [this]/[hits] from enemy PHYSICAL attacks in the last [Unarmored_Hit_Timer] seconds.
+local Unarmored_Hit_Timer   = 60  -- [This] many seconds have to pass for a hit taken to stop reducing Unarmored XP gained from following hits.
+local Unarmored_Beast_Races = 6   -- Unarmored levels [this] times faster when you're an armor-clad Argonian/Khajiit. It's for your head and feetsies.
                                   -- | Only applies if you've got 3 or less empty slots (counting shield). Bonus is divided among those empty slots.
                                   -- | It's meant to make the heavy handicap from not being able to equip head and feet armor less bad, if you're running an armored character.
                                   -- | It's NOT meant to help, and will NOT affect, fully unarmored characters. Unarmored beast characters level the same as all others.
 
-local Armor_Damage_To_XP  = 6  -- This much pre-mitigation physical damage is equivalent to one vanilla armor hit. Roughly.
-local Block_Damage_To_XP  = 15 -- This much pre-mitigation physical damage is equivalent to one vanilla block hit. Roughly.
+local Armor_Damage_To_XP  = 6  -- [This] much pre-mitigation physical damage is equivalent to one vanilla armor hit. Roughly.
+local Block_Damage_To_XP  = 15 -- [This] much pre-mitigation physical damage is equivalent to one vanilla block hit. Roughly.
 
-local Weapon_Damage_to_XP = 10 -- This much physical damage is equivalent to one vanilla weapon hit. Roughly.
-local Weapon_Wear_Mult    = 2  -- Directly multiplies Vanilla durability loss. Only takes effect if you have enabled S_U_S_Weapon-XP-Precision.
-                              -- | You'll always lose at least 1 durability per hit, even if you set this to 0.
+local Weapon_Wear_Mult      = 2  -- Directly multiplies Vanilla durability loss. Only takes effect if you have enabled S_U_S_Weapon-XP-Precision.
+                                 -- | You'll always lose at least 1 durability per hit, even if you set [this] to 0.
+local Physical_Damage_to_XP = 15 -- [This] much physical damage is equivalent to one vanilla hit. Roughly.
+                                 -- | All Melee and Ranged weapons, as well as Hand to Hand, use this setting.
+local HandToHand_Strength = 1/40 -- Hand to Hand xp per hit is multiplied by STR * [this]. Set [this] to 1 if you want to disable it.
+                                 -- The default 1/40 means at 40 STR you deal vanilla damage, at 80 2x as much, at 100 2.5x etc
+                                 -- The default is what OpenMW's "Factor strength into hand-to-hand combat" setting uses.
 
 -----------------------------------------------------------------------------------------------------------
 
@@ -38,7 +44,14 @@ local Weapon_Wear_Mult    = 2  -- Directly multiplies Vanilla durability loss. O
 local eps = 0.001
 function equal(a,b)          return (math.abs(b - a) < eps)                                  end
 
-local function printify(num) return math.floor(num*100)/100                                    end
+local function printify(num) return math.floor(num*100 + 0.5)/100 end
+local function percentify(num)
+    stringnum = 'nopercent?'
+    if      num >= 10  then stringnum = tostring(math.floor(num*100 + 0.5)..'%')
+    elseif  num >= -1  then stringnum = tostring(math.floor(num*10000 + 0.5)/100 ..'%') 
+    else                    stringnum = tostring(math.floor(num*100 + 0.5)..'%') end
+    return stringnum
+end
 
 local function get_val(not_table_or_func)   return not_table_or_func                                        end
 
@@ -59,14 +72,22 @@ end
 
 local function makecounter(val)
     local count = val
---     local simseconds = function() return core.getSimulationTime() - (core.getSimulationTime() % time.second) end
---     local start = simseconds() -- for debugging
+    local simseconds = function() return core.getSimulationTime() - (core.getSimulationTime() % 0.01 * time.second) end
+    local start = simseconds() -- for debugging
+    local last  = start
+    local current = start
     return function(mod)
         count = count + mod
---         print('Count: '..count .. ' | Time: '..(simseconds() - start)) --- core.getGameTime() % time.second - start)
+        if mod > 0 then -- Testing
+            current = simseconds() - start
+            print('Count: '..count .. ' | Time: '..printify(current)..' | Attackspeed: '.. printify(1/(current - last))) --- core.getGameTime() % time.second - start)
+            last = current
+        end
         return count
     end
 end
+
+
 
 -- Credit to zackhasacat for this one
 -- I shortened it by removing checks I don't need (due to where it's used)
@@ -77,11 +98,11 @@ function getArmorType(armor_obj)
     local armorType       = types.Armor.record(armor_obj).type
     local weight          = types.Armor.record(armor_obj).weight
     local armorTypeWeight = math.floor(Dt.ARMOR_TYPES[armorType])
-    if     weight <= armorTypeWeight * lightMultiplier then -- print("SKILL: lightarmor")
+    if     weight <= armorTypeWeight * lightMultiplier then -- print('SKILL: lightarmor')
         return 'lightarmor'
-    elseif weight <= armorTypeWeight * medMultiplier   then -- print("SKILL: mediumarmor")
+    elseif weight <= armorTypeWeight * medMultiplier   then -- print('SKILL: mediumarmor')
         return 'mediumarmor'
-    else                                                    -- print("SKILL: heavyarmor")
+    else                                                    -- print('SKILL: heavyarmor')
         return 'heavyarmor'
     end
 end
@@ -92,6 +113,30 @@ end
 local Fn = {}
 
 -----------------------------------------------------------------------------------------------------------
+
+Fn.register_h2h_counter = function()
+    local attackCallback = async:callback(function()
+            if input.getBooleanActionValue("Use") then
+                -- If in a menu or not in weapon stance, we're not attacking so we go back
+                if i_UI.getMode() or not Dt.STANCE_WEAPON[types.Actor.getStance(self)] then return end
+                local weapon = types.Actor.getEquipment(self, Dt.SLOTS.WEAPON)
+                if not weapon then
+                    Dt.attackspeed:update()                                          -- Fn.recent_activations(1, 'h2h', 3.1)
+                elseif Dt.WEAPON_TYPES.MELEE[types.Weapon.record(weapon).type]    then
+                    Dt.pc_held_weapon_condition = Fn.get_equipped('MELEE').condition --:set_prevframe(Fn.get_equipped('MELEE').condition)
+                    Dt.attackspeed:update()
+                elseif Dt.WEAPON_TYPES.BOW[types.Weapon.record(weapon).type]      then
+                    Dt.pc_bow                   = Fn.get_equipped('BOW')             --:set_prevframe(Fn.get_equipped('BOW'))
+                    if types.Actor.getEquipment(self, Dt.SLOTS.AMMO) then Dt.pc_ammo = Fn.get_equipped('AMMO') end
+                    Dt.attackspeed:update()
+                elseif Dt.WEAPON_TYPES.THROWING[types.Weapon.record(weapon).type] then
+                    Dt.pc_thrown                = Fn.get_equipped('THROWING').object
+                    Dt.attackspeed:update()                                          -- Fn.recent_activations(1, 'thrown', 3.1)
+                end
+            end
+        end)
+    input.registerActionHandler("Use", attackCallback)
+end
 
 Fn.get_active_effect_mag = function(effectid)
     local modifier = 0
@@ -181,21 +226,7 @@ Fn.get_equipped = function(TYPEenum) --Returns a table with three values: the ob
 end
 
 Fn.get_weapon_data = function()
-    local weapon = types.Actor.getEquipment(self, Dt.SLOTS.WEAPON)
-    if not weapon then return
-    elseif Dt.WEAPON_TYPES.MELEE[types.Weapon.record(weapon).type]    then
-        Dt.pc_held_weapon_condition:set_prevframe(Fn.get_equipped('MELEE').condition)
-    elseif Dt.WEAPON_TYPES.BOW[types.Weapon.record(weapon).type]      then
-        Dt.pc_bow:set_prevframe(Fn.get_equipped('BOW'))
-        if types.Actor.getEquipment(self, Dt.SLOTS.AMMO) then Dt.pc_ammo = Fn.get_equipped('AMMO') end
-    elseif Dt.WEAPON_TYPES.THROWING[types.Weapon.record(weapon).type] then
-        local new = Fn.get_equipped('THROWING')
-        Dt.pc_thrown.object = new.object
-        Dt.pc_thrown:set_prevcount(new.count)
-        if new.count < Dt.pc_thrown.prevcount then
-            Fn.recent_activations(1, 'thrown', 9.5)
-        end
-    end
+
 end
 
 Fn.get_hit_armorpiece = function()
@@ -218,33 +249,37 @@ Fn.get_magic_shield = function()
     return modifier
 end
 
+Fn.clean_slots = function(_slot) -- This is to guarantee we don't get ghost unarmored slots for gauntlets and bracers
+    if     _slot == types.Armor.TYPE.LBracer or _slot == types.Armor.TYPE.LGauntlet then
+        armor_types[types.Armor.TYPE.LBracer  ] = nil
+        armor_types[types.Armor.TYPE.LGauntlet] = nil
+    elseif _slot == types.Armor.TYPE.RBracer or _slot == types.Armor.TYPE.RGauntlet then
+        armor_types[types.Armor.TYPE.RBracer  ] = nil
+        armor_types[types.Armor.TYPE.RGauntlet] = nil
+    else armor_types[_slot] = nil
+    end
+end
+
 Fn.get_AR = function()
     local skill       = 0
     local rating      = 0
     local armor_types = get(Dt.ARMOR_TYPES) -- We copy this table. We could have copied ARMOR_RATING_WEIGHTS too, all that matters is that it includes all slots.
-    local clean_slots = function(_slot) -- This is to guarantee we don't get ghost unarmored slots for gauntlets and bracers
-        if     _slot == types.Armor.TYPE.LBracer or _slot == types.Armor.TYPE.LGauntlet then
-            armor_types[types.Armor.TYPE.LBracer  ] = nil
-            armor_types[types.Armor.TYPE.LGauntlet] = nil
-        elseif _slot == types.Armor.TYPE.RBracer or _slot == types.Armor.TYPE.RGauntlet then
-            armor_types[types.Armor.TYPE.RBracer  ] = nil
-            armor_types[types.Armor.TYPE.RGauntlet] = nil
-        else armor_types[_slot] = nil
+    -- Add AR from all slots with armor. OnLY iF we hAvE ArMOr!!
+    local armor = Fn.get_equipped('ARMOR')
+    if armor then
+        for _, _obj in ipairs(armor) do
+            skill  = types.Player.stats.skills[getArmorType(_obj)](self).modified
+            local slot   = types.Armor.record(_obj).type
+            local hp_mod = types.Item.itemData(_obj).condition / types.Armor.record(_obj).health
+            rating = rating + types.Armor.record(_obj).baseArmor * hp_mod * Dt.ARMOR_RATING_WEIGHTS[slot] * skill / Dt.GMST.iBaseArmorSkill
+            Fn.clean_slots(slot)
         end
-    end
-    -- Add AR from all slots with armor
-    for _, _obj in ipairs(Fn.get_equipped('ARMOR')) do
-        skill  = types.Player.stats.skills[getArmorType(_obj)](self).modified
-        local slot   = types.Armor.record(_obj).type
-        local hp_mod = types.Item.itemData(_obj).condition / types.Armor.record(_obj).health
-        rating = rating + types.Armor.record(_obj).baseArmor * hp_mod * Dt.ARMOR_RATING_WEIGHTS[slot] * skill / Dt.GMST.iBaseArmorSkill
-        clean_slots(slot)
     end
     -- Add AR for slots that didn't have armor
     for _slot, _ in pairs(armor_types) do
         skill = types.Player.stats.skills.unarmored(self).modified
         rating = rating + skill * Dt.GMST.fUnarmoredBase1 * skill * Dt.GMST.fUnarmoredBase2 * Dt.ARMOR_RATING_WEIGHTS[_slot]-- Why have 2 GMSTs for 1 number? Precision? Yeah precision I guess.
-        clean_slots(_slot)
+        Fn.clean_slots(_slot)
     end
     rating = rating + Fn.get_magic_shield()
     return rating
@@ -252,37 +287,31 @@ end
 
 Fn.get_unarmored_slots = function()
     local armor_types = get(Dt.ARMOR_TYPES) -- We copy this table. We could have copied ARMOR_RATING_WEIGHTS too, all that matters is that it includes all slots.
-    local clean_slots = function(_slot) -- This is to guarantee we don't get ghost unarmored slots for gauntlets and bracers
-        if     _slot == types.Armor.TYPE.LBracer or _slot == types.Armor.TYPE.LGauntlet then
-            armor_types[types.Armor.TYPE.LBracer  ] = nil
-            armor_types[types.Armor.TYPE.LGauntlet] = nil
-        elseif _slot == types.Armor.TYPE.RBracer or _slot == types.Armor.TYPE.RGauntlet then
-            armor_types[types.Armor.TYPE.RBracer  ] = nil
-            armor_types[types.Armor.TYPE.RGauntlet] = nil
-        else armor_types[_slot] = nil
-        end
-    end
-    -- Remove all slots with armor from the list
-    for _, _obj in ipairs(Fn.get_equipped('ARMOR')) do
-        clean_slots(types.Armor.record(_obj).type)
-    end
+    -- Remove all slots with armor from the list. OnLY iF we hAvE ArMOr!!
+    local armor = Fn.get_equipped('ARMOR')
+    if armor then for _, _obj in ipairs(armor) do Fn.clean_slots(types.Armor.record(_obj).type) end end
     local unarmored_slots = {}
     -- Add slots that didn't have armor to this new iterable, #ble table
-    for _slot, _ in pairs(armor_types) do
-        table.insert(unarmored_slots, _slot)
-    end
+    for _slot, _ in pairs(armor_types) do table.insert(unarmored_slots, _slot) end
     return unarmored_slots
 end
 
-Fn.recent_activations = function(amount, source, simtime)
-    if not Dt.recent_activations[source] then
-        Dt.recent_activations[source] = {callback = source, counter = makecounter(0)}
-        Dt.recent_activations[source].callback = async:registerTimerCallback(Dt.recent_activations[source].callback, Dt.recent_activations[source].counter)
-    end
-    async:newSimulationTimer(simtime, Dt.recent_activations[source].callback, -amount)
-    return Dt.recent_activations[source].counter(amount)
-end
+-- Fn.recent_activations = function(amount, source, simtime) -- unused
+--     if not Dt.recent_activations[source] then
+--         Dt.recent_activations[source] = {callback = source, counter = makecounter(0)}
+--         Dt.recent_activations[source].callback = async:registerTimerCallback(Dt.recent_activations[source].callback, Dt.recent_activations[source].counter)
+--     end
+--     async:newSimulationTimer(simtime, Dt.recent_activations[source].callback, -amount)
+--     return Dt.recent_activations[source].counter(amount)
+-- end
 
+Fn.estimate_base_damage = function(t) --{full = 0, spam = 0, speed = 0, min = 0, max = 0}
+    if t.speed < t.full/5 then t.speed = (t.full + t.spam) / 1.66 end -- If 1st attack, then we set speed to a little less than average, since you're very likely to have fully drawn it.
+    local draw = math.min(1, math.max(0, (t.spam - t.speed)/(t.spam - t.full))) -- Now we get draw% (normalised from 0 to 1)
+    local damage = t.min + (t.max - t.min) * draw
+--     print(printify(t.speed)..' | '..printify(draw))
+    return damagedad
+end
 Fn.make_scalers = function()
 
     -- ARMOR Scaling
@@ -304,9 +333,10 @@ Fn.make_scalers = function()
                 local damage = (condition_lost * rating)/(rating - condition_lost)
                 -- Armor skill and AR GMSTs are combined to make leveling below base AR faster, and above slower.
                 local skill = types.Player.stats.skills[_skillid](self).base
-                xp = xp * damage/Armor_Damage_To_XP * 2*Dt.GMST.iBaseArmorSkill / (Dt.GMST.iBaseArmorSkill + skill)
+                local multiplier = damage/Armor_Damage_To_XP * 2*Dt.GMST.iBaseArmorSkill / (Dt.GMST.iBaseArmorSkill + skill)
+                xp = xp * multiplier
 
-                print("SUS - Armor XP Mult: ".. printify(damage/Armor_Damage_To_XP * 2*Dt.GMST.iBaseArmorSkill / (Dt.GMST.iBaseArmorSkill + skill))..' | Damage Received: '.. printify(damage))
+                print('SUS [Armor] XP Mult: '.. printify(multiplier)..' | Skill Progress: '..percentify(xp)..' | Damage Received: '.. printify(damage))
 
                 return xp
             end
@@ -328,9 +358,13 @@ Fn.make_scalers = function()
             local damage = condition_lost
             -- Armor skill and AR GMSTs are combined to make leveling below base AR faster, and above slower.
             local skill = types.Player.stats.skills.block(self).base
-            xp = xp * damage/Block_Damage_To_XP * (Dt.GMST.iBlockMaxChance+Dt.GMST.iBlockMinChance) / (2*Dt.GMST.iBlockMinChance + skill)
 
-            print("SUS - Block XP: ".. printify(2.5 * damage/Block_Damage_To_XP * (Dt.GMST.iBlockMaxChance+Dt.GMST.iBlockMinChance) / (2*Dt.GMST.iBlockMinChance + skill))..' | Damage Received: '.. printify(damage))
+            -- Scale XP:
+
+            local multiplier = damage/Block_Damage_To_XP * (Dt.GMST.iBlockMaxChance+Dt.GMST.iBlockMinChance) / (2*Dt.GMST.iBlockMinChance + skill)
+            xp = xp * multiplier
+
+            print('SUS [Block] XP Mult: '.. printify(multiplier)..' | Skill Progress: '..percentify(xp)..' | Damage Received: '.. printify(damage))
 
             return xp
         end
@@ -341,11 +375,13 @@ Fn.make_scalers = function()
     Dt.scalers:new{ name = 'unarmored', 
         func = function(xp)
 
+
             -- Calculate factors:
 
-            local dodge_factor  = 1 + 0.01 * (Fn.get_active_effect_mag('sanctuary') + 0.2*types.Player.stats.attributes.agility(self).modified + 0.1*types.Player.stats.attributes.luck(self).modified)
             local armor_weight = 0
-            for _, _obj in ipairs(Fn.get_equipped('ARMOR')) do armor_weight = armor_weight + types.Armor.record(_obj).weight end
+            local armor = Fn.get_equipped('ARMOR')
+            -- Only calculate armor if there is armor, oR eLSE. >:|
+            if armor then for _, _obj in ipairs(armor) do armor_weight = armor_weight + types.Armor.record(_obj).weight end end
             local race         = get_val(types.Player.record(self).race)
             local beast_factor = 1 -- If you have more than 3 empty slots, this will stay a 1 and not affect your XP rates, even if you are Argonian/Khajiit
             if #Fn.get_unarmored_slots() <= 3 and (race == 'argonian' or race == 'khajiit') then beast_factor = Unarmored_Beast_Races / #Fn.get_unarmored_slots() end
@@ -356,9 +392,10 @@ Fn.make_scalers = function()
 
             -- Scale XP:
 
-            local xp = xp * skill_factor * beast_factor * dodge_factor * gank_factor
+            local multiplier = skill_factor * beast_factor * gank_factor
+            local xp = xp * multiplier
 
-            print("SUS - Unarmored XP Mult: ".. printify(skill_factor * beast_factor * dodge_factor * gank_factor))
+            print('SUS [Unarmored] XP Mult: '.. printify(multiplier)..' | Skill Progress: '..percentify(xp))
 
             return xp
         end
@@ -374,7 +411,10 @@ Fn.make_scalers = function()
 
                 local mp_factor = 0.01*Fn.get_active_effect_mag('fortifymagicka') + 0.1*Fn.get_active_effect_mag('fortifymaximummagicka')
                 local spell_cost = types.Actor.getSelectedSpell(self).cost
-                xp = xp * spell_cost/Magicka_to_XP * 4.8/(4 + mp_factor)
+                local multiplier = spell_cost/Magicka_to_XP * 4.8/(4 + mp_factor)
+                xp = xp * multiplier
+
+                print('SUS [Magic] XP Mult: '.. printify(multiplier)..' | Skill Progress: '..percentify(xp)..' | Spell Cost: '.. printify(spell_cost))
 
                 -- MP Refund:
                                             -- Calculate factors
@@ -393,7 +433,7 @@ Fn.make_scalers = function()
                 --To keep vanilla compatibility, we have to consider current>max as a valid gameplay state, since Fortify Magicka doesn't increase Max MP.
                 types.Player.stats.dynamic.magicka(self).current = types.Player.stats.dynamic.magicka(self).current + refund
 
-                print("SUS - Refund: ".. math.floor(refund/spell_cost*100)..'% | '.. math.floor(refund*100)/100 ..' MP')
+                print('SUS - Refund: '.. printify(refund*100)..'% | '.. printify(refund) ..' MP')
 
                 return xp
             end
@@ -415,7 +455,7 @@ Fn.make_scalers = function()
                 elseif not weapon then return xp 
                 end
                 
-                local condition_lost = Dt.pc_held_weapon_condition.prevframe - weapon.condition
+                local condition_lost = Dt.pc_held_weapon_condition - weapon.condition
                 local damage = condition_lost/Dt.GMST.fWeaponDamageMult
                 
                 local wp_obj = weapon.object
@@ -428,28 +468,32 @@ Fn.make_scalers = function()
                     wp_obj:sendEvent('modifyCondition', codition_delta)
                 end
 
+
                 -- NOTE: due to durability being an integer, you only lose more than 1 when dealing over 20 damage (unless you have changed your Durability GMST).
                 -- To deal with this, we use a different formula when your weapon deals under 20 damage.
                 -- If you have the Weapon-XP-Precision addon, this only gets used under 5 damage instead.
                 local wp = types.Weapon.record(wp_obj)
+                local speed_factor = 0.5 + wp.speed/2 -- Attackspeed, approximated to it's effect on animation speed
                 local min_cond_dmg = 2 / Dt.GMST.fWeaponDamageMult
                 if damage < (min_cond_dmg - 0.001) then
                     local str_mod = types.Player.stats.attributes.strength(self).base * Dt.GMST.fDamageStrengthMult / 10 + Dt.GMST.fDamageStrengthBase
-                    local function getMinDamage(val) return math.min(min_cond_dmg, val * str_mod) end
-                    damage = ( getMinDamage(wp.chopMaxDamage  ) + getMinDamage(wp.chopMinDamage  )
-                             + getMinDamage(wp.slashMaxDamage ) + getMinDamage(wp.slashMinDamage )
-                             + getMinDamage(wp.thrustMaxDamage) + getMinDamage(wp.thrustMinDamage)
-                             ) / 6
+                    local condition_mod = weapon.condition/types.Weapon.record(wp_obj).health
+                    local function getMinDamage(val) return math.max(1, math.min(min_cond_dmg, val * str_mod * condition_mod)) end
+                    local mindamage = (getMinDamage(wp.chopMinDamage) + getMinDamage(wp.slashMinDamage) + getMinDamage(wp.thrustMinDamage))/3
+                    local maxdamage = (getMinDamage(wp.chopMaxDamage) + getMinDamage(wp.thrustMaxDamage) + getMinDamage(wp.slashMaxDamage))/3
+                    damage = Fn.estimate_base_damage{speed = Dt.attackspeed.current, full = 0.85*speed_factor, spam = 1.45*speed_factor,
+                                                     min = getMinDamage(mindamage), max = getMinDamage(maxdamage)}
                 end
 
                 -- Scale XP:
-                
+
                 local skill = types.Player.stats.skills[_skillid](self).base
                 --NOTE: due to durability being an integer, this will only change in steps of 10 damage (unless you have changed your Durability GMST).
                 -- If you have the Weapon-XP-Precision addon, this increases in steps of 2.5 damage instead.
-                xp = xp * damage/wp.speed/Weapon_Damage_to_XP * 80/(40 + math.min(skill, 100)) -- We use math.min here because hit rate can't go above 100, so we shouldn't scale past it.
+                local multiplier = damage/speed_factor/Physical_Damage_to_XP * 80/(40 + math.min(skill, 100)) -- We use math.min here because hit rate can't go above 100, so we shouldn't scale past it.
+                xp = xp * multiplier
 
-                print("SUS - Melee XP Mult: ".. math.floor(100*damage/wp.speed/Weapon_Damage_to_XP * 80/(40 + math.min(skill, 100)))/100)
+                print('SUS [Melee] XP Mult: '.. printify(multiplier)..' | Skill Progress: '..percentify(xp)..' | Damage Dealt: '.. printify(damage))
 
                 return xp
             end
@@ -459,10 +503,10 @@ Fn.make_scalers = function()
 -----------------------------------------------------------------------------------------------------------        Dt.scalers:new{ name = 'marksman', 
     Dt.scalers:new{ name = 'marksman', 
         func = function(xp)
-            -- Mostly the same as MELEE, but we an abridged the alternate formula for throwables and different Dt values for bows & crossbows
+            -- Mostly the same as MELEE, but we an abridged alternate formula for throwables and different Dt values for bows & crossbows
             local bow    = Fn.get_equipped('BOW')
             local ammo   = Dt.pc_ammo
-            local thrown = Dt.pc_thrown.object
+            local thrown = Dt.pc_thrown
             local wp     = nil -- This is to set scope only.
             local damage = nil -- This is to set scope only.
             
@@ -474,7 +518,7 @@ Fn.make_scalers = function()
                 -- Throwables don't care about durability, nor disintegrate whatever.
                 if Fn.has_effect('disintegrateweapon') then return xp end 
                 
-                local condition_lost = Dt.pc_bow.prevframe.condition - bow.condition
+                local condition_lost = Dt.pc_bow.condition - bow.condition
                 damage = condition_lost/Dt.GMST.fWeaponDamageMult
                 
                 local wp_obj = bow.object
@@ -489,58 +533,84 @@ Fn.make_scalers = function()
                 local min_cond_dmg = 2 / Dt.GMST.fWeaponDamageMult
                 if damage < (min_cond_dmg - 0.001) then
                     local str_mod = types.Player.stats.attributes.strength(self).base * Dt.GMST.fDamageStrengthMult / 10 + Dt.GMST.fDamageStrengthBase
-                    local function getMinDamage(val) return math.min(min_cond_dmg, val * str_mod) end
-                    damage = (getMinDamage(wp.chopMaxDamage) + getMinDamage(wp.chopMinDamage)) / 6
+                    local condition_mod = bow.condition/types.Weapon.record(bow.object).health
+                    local function getMinDamage(val) return math.max(1, math.min(min_cond_dmg, val * str_mod * condition_mod)) end
+                    damage = Fn.estimate_base_damage{speed = Dt.attackspeed.current, full = 0.5, spam = 0.75, min = getMinDamage(wp.chopMinDamage), max = getMinDamage(wp.chopMaxDamage)}
                 end
                 
             -- Thrown Weapon Scaler
             elseif thrown then 
                 wp = types.Weapon.record(thrown)
                 local str_mod = types.Player.stats.attributes.strength(self).base * Dt.GMST.fDamageStrengthMult / 10 + Dt.GMST.fDamageStrengthBase
-                local attack_count = Dt.recent_activations.thrown.counter(0)
-                -- According to my testing, in 9 seconds you can get off ~12 attacks at full spam, and up to 8 while fully charging. We use these two numbers to do our magic.
-                -- If count under 7, you either just started attacking with a throuwn weapon, or stopped for a moment.
-                -- We make a callback staircase with increasing timers, bumping count up to the full-drawn attack speed
-                -- If you're full-drawing then attack_count will hover over 8,but if you start spamming it will quickly go up to 12-14
-                if attack_count <= 7 then for i=1, 8 - math.floor(attack_count) do Fn.recent_activations(1, 'thrown', i + 0.5) end end
-                -- As combat goes, this number will aproximate your actual attack speed, and from that we infer whether you're fully drawing your weapon or not.
-                attack_count = math.max(7.9, Dt.recent_activations.thrown.counter(0)) -- We clamp at 7.9 attacks per 9s, since that's the fastest full drawn attackspeed you can manage.
-                -- Now we use our makeshift attack draw estimation to (hopefully) get your damage (mostly) right.
-                damage = wp.chopMinDamage + (wp.chopMaxDamage - wp.chopMinDamage) * math.max(0, 12 - attack_count)/4
-                damage = damage * str_mod -- Gotta account for chonk stronk
-                print(wp.chopMinDamage    ..' | '.. wp.chopMaxDamage)
-                print(wp.slashMinDamage   ..' | '.. wp.slashMaxDamage)
-                print(wp.thrustMinDamage  ..' | '.. wp.thrustMaxDamage)
-                print(Dt.recent_activations.thrown.counter(0))
-                print('SUS - Throwing Damage: '..printify(damage))
+                -- Now we use our handy attack draw estimation along with min and max damage to (hopefully) get your real damage (mostly) right.
+                -- full = 0.9 -- config point. Less than this is  a full draw or 1st click.
+                -- spam = 1.45 -- config point. More than this is spam clicking.
+                damage = Fn.estimate_base_damage{speed = Dt.attackspeed.current, full = 0.9, spam = 1.45, min = wp.chopMinDamage, max = wp.chopMaxDamage}
+                damage = damage * str_mod * 2 -- Gotta account for chonk stronk & for thrown weaponns being both weapon and ammo
             -- If we don't have a bow but somehow don't remember last throwable either, also skip.
             else print('SUS - No Ammo in Dt.pc_ammo') return xp
             -- If we got here, we have a valid weapon and damage number, and should apply scaling.
             end
 
             -- Scale XP:
-            
+
+            local speed_factor = 0.5 + wp.speed/2
             local skill = types.Player.stats.skills['marksman'](self).base
             --NOTE: due to durability being an integer, this will only change in steps of 10 damage (unless you have changed your Durability GMST).
             -- If you have the Weapon-XP-Precision addon, this increases in steps of 2.5 damage instead.
-            xp = xp * damage/wp.speed/Weapon_Damage_to_XP * 80/(40 + math.min(skill, 100)) -- We use math.min here because hit rate can't go above 100, so we shouldn't scale past it.
+            local multiplier = damage/speed_factor/Physical_Damage_to_XP * 80/(40 + math.min(skill, 100)) -- We use math.min here because hit rate can't go above 100, so we shouldn't scale past it.
+            xp = xp * multiplier
 
-            print("SUS - Marksman XP Mult: ".. math.floor(100*damage/wp.speed/Weapon_Damage_to_XP * 80/(40 + math.min(skill, 100)))/100)
+            print('SUS [Marksman] XP Mult: '.. printify(multiplier)..' | Skill Progress: '..percentify(xp)..' | Damage Dealt: '.. printify(damage))
 
             return xp
         end
     }
-    print('Scalers constructed')
-
-    -- Marksman Scaling
+    -- HAND TO HAND Scaling
 -----------------------------------------------------------------------------------------------------------
---     Dt.scalers:new{
---         name = 'marksman',
---         func = function(xp)
---             if 
---             return xp
---         end
---     }
+    Dt.scalers:new{ name = 'TODO|handtohand', 
+        func = function(xp)
+--             -- Mostly the same as Thrown Weapon, but we get attacks from the use action instead of from projectile count, and we get damage directly from H2H math
+--             local damage = nil -- This is to set scope only.
+--             local str_mod = types.Player.stats.attributes.strength(self).base * HandToHand_Strength
+--             local attack_count = nil --scopeset
+--             if not (Dt.recent_activations.h2h and Dt.recent_activations.h2h.counter) then attack_count = 0 -- we don't need to return. if counter isn't present for some god forsaken reason then we're about to create it anyways.
+--             else attack_count = Dt.recent_activations.h2h.counter(0) end
+--             -- If count under 7, you either just started fisting, or stopped for a moment mid-combat.
+--             -- We make a callback staircase with increasing timers, bumping count up to the full-drawn attack speed
+--             -- If you're full-drawing then attack_count will hover over 8, but if you start spamming it will quickly go up beyond that.
+--             if attack_count <= 7 then for i=1, 8 - math.floor(attack_count) do Fn.recent_activations(1, 'h2h', i) end end
+--             -- As combat goes, this number will aproximate your actual attack speed, and from that we infer whether you're fully drawing your fists or not.
+--             attack_count = math.max(7.9?, Dt.recent_activations.h2h.counter(0)) -- We clamp at 7.9 attacks per 9s, since that's the fastest full drawn attackspeed you can manage.
+--             -- Now we use our makeshift attack draw estimation to (hopefully) get your damage (mostly) right.
+--             damage = attack_min + (attack_max - attack_min) * math.max(0, 12? - attack_count)/4?
+--             damage = damage * str_mod * 2 -- Gotta account for chonk stronk & for h2h weaponns being both weapon and ammo
+--             -- If we don't have a bow but somehow don't remember last throwable either, also skip.
+--             else print('SUS - No Ammo in Dt.pc_ammo') return xp
+--             -- If we got here, we have a valid weapon and damage number, and should apply scaling.
+--             end
+--                 local speed = Dt.attackspeed.current
+--                 local full = 0.9 -- config point. Less than this is  a full draw or 1st click.
+--                 local spam = 2.0 -- config point. More than this is spam clicking.
+--                 -- If 1st attack, then we set speed to a little less than average, since you're very likely to fully draw your 1st attack:
+--                 if speed < full/5 then speed = (full + spam) / 1.66
+--                 attack_draw = math.min(0, (spam - speed)/full) --# Now we get draw% (normalised from 0 to 1)
+--                 damage = dmg.min + (dmg.max - dmg.min) * attack_draw
+--                 damage = damage * str_mod     # Throwing also gets * 2 here.
+-- 
+--             -- Scale XP:
+-- 
+--             local skill = types.Player.stats.skills['handtohand'](self).base
+--             local multiplier = damage/Physical_Damage_to_XP * 80/(40 + math.min(skill, 100)) -- We use math.min here because hit rate can't go above 100, so we shouldn't scale past it.
+--             xp = xp * multiplier
+-- 
+--             print(printify(speed_factor))
+--             print('SUS [Marksman] XP Mult: '.. printify(multiplier)..' | Skill Progress: '..percentify(xp)..' | Damage Dealt: '.. printify(damage))
+
+            return xp
+        end
+    }
+    print('SUS: Scalering Commenced')
 end
 
 -----------------------------------------------------------------------------------------------------------
