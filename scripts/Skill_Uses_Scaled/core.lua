@@ -8,7 +8,7 @@ local Fn = require('scripts.Skill_Uses_Scaled.func')
 
 has_precision_addon = core.contentFiles.has("S_U_S_Weapon-XP-Precision.omwaddon") -- No need to check this at the moment, I accidentally made the formulas natively compatible lol
 
-Fn.register_h2h_counter()
+Fn.register_Use_Action_Handler()
 
 onActive = function()
     Fn.make_scalers()
@@ -38,5 +38,6 @@ return {
         onUpdate = onUpdate,
     },
     eventHandlers = {
+    SUS_updateGLOBvar = function(t) Dt.GLOB[t.id] = t.val end
     }
 }

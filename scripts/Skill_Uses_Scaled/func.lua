@@ -37,6 +37,7 @@ local Physical_Damage_to_XP = 15 -- [This] much physical damage is equivalent to
 local HandToHand_Strength = 1/40 -- Hand to Hand xp per hit is multiplied by STR * [this]. Set [this] to 1 if you want to disable it.
                                  -- The default 1/40 means at 40 STR you deal vanilla damage, at 80 2x as much, at 100 2.5x etc
                                  -- The default is what OpenMW's "Factor strength into hand-to-hand combat" setting uses.
+local H2H_STR_Werewolves = false -- If this is true, HandToHand_Strength will affect your xp as a werewolf.
 
 -----------------------------------------------------------------------------------------------------------
 
@@ -74,15 +75,8 @@ local function makecounter(val)
     local count = val
     local simseconds = function() return core.getSimulationTime() - (core.getSimulationTime() % 0.01 * time.second) end
     local start = simseconds() -- for debugging
-    local last  = start
-    local current = start
     return function(mod)
         count = count + mod
-        if mod > 0 then -- Testing
-            current = simseconds() - start
-            print('Count: '..count .. ' | Time: '..printify(current)..' | Attackspeed: '.. printify(1/(current - last))) --- core.getGameTime() % time.second - start)
-            last = current
-        end
         return count
     end
 end
@@ -113,15 +107,19 @@ end
 local Fn = {}
 
 -----------------------------------------------------------------------------------------------------------
-
-Fn.register_h2h_counter = function()
-    local attackCallback = async:callback(function()
+Fn.register_Use_Action_Handler = function()
+    local useCallback = async:callback(function()
             if input.getBooleanActionValue("Use") then
                 -- If in a menu or not in weapon stance, we're not attacking so we go back
                 if i_UI.getMode() or not Dt.STANCE_WEAPON[types.Actor.getStance(self)] then return end
                 local weapon = types.Actor.getEquipment(self, Dt.SLOTS.WEAPON)
+                if not (weapon.type == types.Weapon) then return end
                 if not weapon then
                     Dt.attackspeed:update()                                          -- Fn.recent_activations(1, 'h2h', 3.1)
+                    -- We request global.lua to request core.lua to update data.lua with the current WerewolfClawMult.
+                    -- We do it here cause it needs 2 frames to resolve due to event delay, and this handler happens ~10 frames before the hit registers and calls the skill handler.
+                    -- Even if the skill handler got called by another mod completely outside this timeframe, the worst that could happen is that it uses an outdated WerewolfClawMult.
+                    if types.NPC.isWerewolf(self) then core.sendGlobalEvent('SUS_updateGLOBvar', {source = self.obj, id = 'WerewolfClawMult'}) end
                 elseif Dt.WEAPON_TYPES.MELEE[types.Weapon.record(weapon).type]    then
                     Dt.pc_held_weapon_condition = Fn.get_equipped('MELEE').condition --:set_prevframe(Fn.get_equipped('MELEE').condition)
                     Dt.attackspeed:update()
@@ -135,7 +133,7 @@ Fn.register_h2h_counter = function()
                 end
             end
         end)
-    input.registerActionHandler("Use", attackCallback)
+    input.registerActionHandler("Use", useCallback)
 end
 
 Fn.get_active_effect_mag = function(effectid)
@@ -388,7 +386,7 @@ Fn.make_scalers = function()
             local gank_factor  = Unarmored_Hits_To_XP / Fn.recent_activations(1, 'unarmored', Unarmored_Hit_Timer)
             local skill        = types.Player.stats.skills['unarmored'](self).base
             local rating       = skill * Dt.GMST.fUnarmoredBase1 * skill * Dt.GMST.fUnarmoredBase2
-            local skill_factor = 100 / (35 + rating + skill + armor_weight * Unarmored_Armor_Mult)
+            local skill_factor = 100 / (35 + rating + skill + armor_weight * Unarmored_Armor_Mult) -- Rating is added here alongside skill, because unarmored has exponential scaling baked in.
 
             -- Scale XP:
 
@@ -454,10 +452,10 @@ Fn.make_scalers = function()
                 -- Will never happen under normal gameplay, but some mod in the future may use such a thing, so better safe than sorry
                 elseif not weapon then return xp 
                 end
-                
+
                 local condition_lost = Dt.pc_held_weapon_condition - weapon.condition
                 local damage = condition_lost/Dt.GMST.fWeaponDamageMult
-                
+
                 local wp_obj = weapon.object
                 -- If you have the Weapon-XP-Precision addon, we add weapon.lua to your weapon.
                 if has_precision_addon then 
@@ -495,7 +493,7 @@ Fn.make_scalers = function()
                 local skill = types.Player.stats.skills[_skillid](self).base
                 --NOTE: due to durability being an integer, this will only change in steps of 10 damage (unless you have changed your Durability GMST).
                 -- If you have the Weapon-XP-Precision addon, this increases in steps of 2.5 damage instead.
-                local multiplier = damage/speed_factor/Physical_Damage_to_XP * 80/(40 + math.min(skill, 100)) -- We use math.min here because hit rate can't go above 100, so we shouldn't scale past it.
+                local multiplier = damage/speed_factor/Physical_Damage_to_XP * 80/(40 + skill)
                 xp = xp * multiplier
 
                 print('SUS [Melee] XP Mult: '.. printify(multiplier)..' | Skill Progress: '..percentify(xp)..' | Damage Dealt: '.. printify(damage))
@@ -563,7 +561,7 @@ Fn.make_scalers = function()
             local skill = types.Player.stats.skills['marksman'](self).base
             --NOTE: due to durability being an integer, this will only change in steps of 10 damage (unless you have changed your Durability GMST).
             -- If you have the Weapon-XP-Precision addon, this increases in steps of 2.5 damage instead.
-            local multiplier = damage/speed_factor/Physical_Damage_to_XP * 80/(40 + math.min(skill, 100)) -- We use math.min here because hit rate can't go above 100, so we shouldn't scale past it.
+            local multiplier = damage/speed_factor/Physical_Damage_to_XP * 80/(40 + skill)
             xp = xp * multiplier
 
             print('SUS [Marksman] XP Mult: '.. printify(multiplier)..' | Skill Progress: '..percentify(xp)..' | Damage Dealt: '.. printify(damage))
@@ -573,48 +571,65 @@ Fn.make_scalers = function()
     }
     -- HAND TO HAND Scaling
 -----------------------------------------------------------------------------------------------------------
-    Dt.scalers:new{ name = 'TODO|handtohand', 
+    Dt.scalers:new{ name = 'handtohand', 
         func = function(xp)
---             -- Mostly the same as Thrown Weapon, but we get attacks from the use action instead of from projectile count, and we get damage directly from H2H math
---             local damage = nil -- This is to set scope only.
---             local str_mod = types.Player.stats.attributes.strength(self).base * HandToHand_Strength
---             local attack_count = nil --scopeset
---             if not (Dt.recent_activations.h2h and Dt.recent_activations.h2h.counter) then attack_count = 0 -- we don't need to return. if counter isn't present for some god forsaken reason then we're about to create it anyways.
---             else attack_count = Dt.recent_activations.h2h.counter(0) end
---             -- If count under 7, you either just started fisting, or stopped for a moment mid-combat.
---             -- We make a callback staircase with increasing timers, bumping count up to the full-drawn attack speed
---             -- If you're full-drawing then attack_count will hover over 8, but if you start spamming it will quickly go up beyond that.
---             if attack_count <= 7 then for i=1, 8 - math.floor(attack_count) do Fn.recent_activations(1, 'h2h', i) end end
---             -- As combat goes, this number will aproximate your actual attack speed, and from that we infer whether you're fully drawing your fists or not.
---             attack_count = math.max(7.9?, Dt.recent_activations.h2h.counter(0)) -- We clamp at 7.9 attacks per 9s, since that's the fastest full drawn attackspeed you can manage.
---             -- Now we use our makeshift attack draw estimation to (hopefully) get your damage (mostly) right.
---             damage = attack_min + (attack_max - attack_min) * math.max(0, 12? - attack_count)/4?
---             damage = damage * str_mod * 2 -- Gotta account for chonk stronk & for h2h weaponns being both weapon and ammo
---             -- If we don't have a bow but somehow don't remember last throwable either, also skip.
---             else print('SUS - No Ammo in Dt.pc_ammo') return xp
---             -- If we got here, we have a valid weapon and damage number, and should apply scaling.
---             end
---                 local speed = Dt.attackspeed.current
---                 local full = 0.9 -- config point. Less than this is  a full draw or 1st click.
---                 local spam = 2.0 -- config point. More than this is spam clicking.
---                 -- If 1st attack, then we set speed to a little less than average, since you're very likely to fully draw your 1st attack:
---                 if speed < full/5 then speed = (full + spam) / 1.66
---                 attack_draw = math.min(0, (spam - speed)/full) --# Now we get draw% (normalised from 0 to 1)
---                 damage = dmg.min + (dmg.max - dmg.min) * attack_draw
---                 damage = damage * str_mod     # Throwing also gets * 2 here.
--- 
---             -- Scale XP:
--- 
---             local skill = types.Player.stats.skills['handtohand'](self).base
---             local multiplier = damage/Physical_Damage_to_XP * 80/(40 + math.min(skill, 100)) -- We use math.min here because hit rate can't go above 100, so we shouldn't scale past it.
---             xp = xp * multiplier
--- 
---             print(printify(speed_factor))
---             print('SUS [Marksman] XP Mult: '.. printify(multiplier)..' | Skill Progress: '..percentify(xp)..' | Damage Dealt: '.. printify(damage))
+            local str_mod = types.Player.stats.attributes.strength(self).base * HandToHand_Strength
+            local speed = Dt.attackspeed.current
+            local full = 0.9 -- config point. Less than this is  a full draw or 1st click.
+            local spam = 2.0 -- config point. More than this is spam clicking.
+            local claw = 0
+            if types.NPC.isWerewolf(self) then
+                claw = Dt.GLOB.WerewolfClawMult
+                if H2H_STR_Werewolves then claw = claw * str_mod end
+            end
+            local damage_per_skillpoint = Fn.estimate_base_damage{speed = Dt.attackspeed.current, full = 0.9, spam = 1.9, min = Dt.GMST.fMinHandToHandMult, max = Dt.GMST.fMaxHandToHandMult}
+            local skill = types.Player.stats.skills['handtohand'](self).base -- Note we don't count fortifies. This prevents sujama from murdering your XP rates.
+            local damage = (damage_per_skillpoint * skill) * str_mod + claw
+            -- Now we average your fatigue damage and your health damage.
+            -- It's the best method I could think of to balance the fact that H2H goes through 2 different healthbars at 2 different rates
+            -- ..while also keeping compatibility with mods that change H2H GMSTs.
+            local damage = (damage + damage * Dt.GMST.fHandtoHandHealthPer)/2
+            -- Scale XP:
+
+            local multiplier = damage/Physical_Damage_to_XP * 80/(40 + skill)
+            xp = xp * multiplier
+
+            print('SUS [Hand-To-Hand] XP Mult: '.. printify(multiplier)..' | Skill Progress: '..percentify(xp)..' | Damage Dealt: '.. printify(damage))
 
             return xp
         end
     }
+    Dt.scalers:new{ name = 'acrobatics', 
+        func = function(xp)
+            
+            local multiplier = 1
+            xp = xp * multiplier
+
+            print('SUS [Acrobatics] XP Mult: '.. printify(multiplier)..' | Skill Progress: '..percentify(xp)..' | : '.. printify(0))
+            return xp
+        end
+    }
+    Dt.scalers:new{ name = 'athletics', 
+        func = function(xp)
+            
+            local multiplier = 1
+            xp = xp * multiplier
+
+            print('SUS [Athletics] XP Mult: '.. printify(multiplier)..' | Skill Progress: '..percentify(xp)..' | : '.. printify(0))
+            return xp
+        end
+    }
+    Dt.scalers:new{ name = 'security', 
+        func = function(xp)
+
+            local multiplier = 1
+            xp = xp * multiplier
+
+            print('SUS [Security] XP Mult: '.. printify(multiplier)..' | Skill Progress: '..percentify(xp)..' | : '.. printify(0))
+            return xp
+        end
+    }
+
     print('SUS: Scalering Commenced')
 end
 

@@ -20,6 +20,7 @@ local function setpreviousval(key, val)
 end
 
 local function printify(num) return math.floor(num*100 + 0.5)/100 end
+
 local function make_atkspeed_meter()
     local simseconds = function() return core.getSimulationTime() - (core.getSimulationTime() % 0.01 * time.second) end
     local last    = simseconds()
@@ -137,17 +138,22 @@ local Dt = {
         [types.Armor.TYPE.RBracer  ] = 0.05,
     },
     GMST = {
-        iBaseArmorSkill     = core.getGMST('iBaseArmorSkill'    ),
-        fWeaponDamageMult   = core.getGMST('fWeaponDamageMult'  ),
-        fDamageStrengthMult = core.getGMST('fDamageStrengthMult'),
-        fDamageStrengthBase = core.getGMST('fDamageStrengthBase'),
-        fLightMaxMod        = core.getGMST('fLightMaxMod'       ),
-        fMedMaxMod          = core.getGMST('fMedMaxMod'         ),
-        fUnarmoredBase1     = core.getGMST('fUnarmoredBase1'    ),
-        fUnarmoredBase2     = core.getGMST('fUnarmoredBase2'    ),
-        iBlockMaxChance     = core.getGMST('iBlockMaxChance'    ),
-        iBlockMinChance     = core.getGMST('iBlockMinChance'    ),
-        
+        iBaseArmorSkill      = core.getGMST('iBaseArmorSkill'     ),
+        fWeaponDamageMult    = core.getGMST('fWeaponDamageMult'   ),
+        fDamageStrengthMult  = core.getGMST('fDamageStrengthMult' ),
+        fDamageStrengthBase  = core.getGMST('fDamageStrengthBase' ),
+        fLightMaxMod         = core.getGMST('fLightMaxMod'        ),
+        fMedMaxMod           = core.getGMST('fMedMaxMod'          ),
+        fUnarmoredBase1      = core.getGMST('fUnarmoredBase1'     ),
+        fUnarmoredBase2      = core.getGMST('fUnarmoredBase2'     ),
+        iBlockMaxChance      = core.getGMST('iBlockMaxChance'     ),
+        iBlockMinChance      = core.getGMST('iBlockMinChance'     ),
+        fMaxHandToHandMult   = core.getGMST('fMaxHandToHandMult'  ),
+        fMinHandToHandMult   = core.getGMST('fMinHandToHandMult'  ),
+        fHandtoHandHealthPer = core.getGMST('fHandtoHandHealthPer'),
+    },
+    GLOB = {
+    WerewolfClawMult = 0
     },
     ATTRIBUTES = {'strength', 'intelligence', 'willpower', 'agility', 'speed', 'endurance', 'personality', 'luck'},
     SKILLS = {
