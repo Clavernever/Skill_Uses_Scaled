@@ -28,7 +28,7 @@ local function make_atkspeed_meter()
     local atkspd  = 0
     return function()
         current = simseconds()
-        print('Attackspeed: '.. printify(1/(current - last))) --- core.getGameTime() % time.second - start)
+--         print('Attackspeed: '.. printify(1/(current - last))) --- core.getGameTime() % time.second - start)
         atkspd = 1/(current - last)
         last = current
         return atkspd

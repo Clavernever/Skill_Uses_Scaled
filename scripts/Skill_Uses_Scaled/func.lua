@@ -113,13 +113,13 @@ Fn.register_Use_Action_Handler = function()
                 -- If in a menu or not in weapon stance, we're not attacking so we go back
                 if i_UI.getMode() or not Dt.STANCE_WEAPON[types.Actor.getStance(self)] then return end
                 local weapon = types.Actor.getEquipment(self, Dt.SLOTS.WEAPON)
-                if not (weapon.type == types.Weapon) then return end
                 if not weapon then
                     Dt.attackspeed:update()                                          -- Fn.recent_activations(1, 'h2h', 3.1)
                     -- We request global.lua to request core.lua to update data.lua with the current WerewolfClawMult.
                     -- We do it here cause it needs 2 frames to resolve due to event delay, and this handler happens ~10 frames before the hit registers and calls the skill handler.
                     -- Even if the skill handler got called by another mod completely outside this timeframe, the worst that could happen is that it uses an outdated WerewolfClawMult.
                     if types.NPC.isWerewolf(self) then core.sendGlobalEvent('SUS_updateGLOBvar', {source = self.obj, id = 'WerewolfClawMult'}) end
+                elseif not (weapon.type == types.Weapon) then return -- Security-related things, and anything else that doesn't use a weapon, will go here when it's added.
                 elseif Dt.WEAPON_TYPES.MELEE[types.Weapon.record(weapon).type]    then
                     Dt.pc_held_weapon_condition = Fn.get_equipped('MELEE').condition --:set_prevframe(Fn.get_equipped('MELEE').condition)
                     Dt.attackspeed:update()
@@ -247,15 +247,16 @@ Fn.get_magic_shield = function()
     return modifier
 end
 
-Fn.clean_slots = function(_slot) -- This is to guarantee we don't get ghost unarmored slots for gauntlets and bracers
+Fn.clean_slots = function(_slot, _armor_types) -- This is to guarantee we don't get ghost unarmored slots for gauntlets and bracers
     if     _slot == types.Armor.TYPE.LBracer or _slot == types.Armor.TYPE.LGauntlet then
-        armor_types[types.Armor.TYPE.LBracer  ] = nil
-        armor_types[types.Armor.TYPE.LGauntlet] = nil
+        _armor_types[types.Armor.TYPE.LBracer  ] = nil
+        _armor_types[types.Armor.TYPE.LGauntlet] = nil
     elseif _slot == types.Armor.TYPE.RBracer or _slot == types.Armor.TYPE.RGauntlet then
-        armor_types[types.Armor.TYPE.RBracer  ] = nil
-        armor_types[types.Armor.TYPE.RGauntlet] = nil
-    else armor_types[_slot] = nil
+        _armor_types[types.Armor.TYPE.RBracer  ] = nil
+        _armor_types[types.Armor.TYPE.RGauntlet] = nil
+    else _armor_types[_slot] = nil
     end
+    return _armor_types
 end
 
 Fn.get_AR = function()
@@ -270,14 +271,14 @@ Fn.get_AR = function()
             local slot   = types.Armor.record(_obj).type
             local hp_mod = types.Item.itemData(_obj).condition / types.Armor.record(_obj).health
             rating = rating + types.Armor.record(_obj).baseArmor * hp_mod * Dt.ARMOR_RATING_WEIGHTS[slot] * skill / Dt.GMST.iBaseArmorSkill
-            Fn.clean_slots(slot)
+            armor_types = Fn.clean_slots(slot, armor_types)
         end
     end
     -- Add AR for slots that didn't have armor
     for _slot, _ in pairs(armor_types) do
         skill = types.Player.stats.skills.unarmored(self).modified
         rating = rating + skill * Dt.GMST.fUnarmoredBase1 * skill * Dt.GMST.fUnarmoredBase2 * Dt.ARMOR_RATING_WEIGHTS[_slot]-- Why have 2 GMSTs for 1 number? Precision? Yeah precision I guess.
-        Fn.clean_slots(_slot)
+        armor_types = Fn.clean_slots(_slot, armor_types)
     end
     rating = rating + Fn.get_magic_shield()
     return rating
@@ -287,21 +288,21 @@ Fn.get_unarmored_slots = function()
     local armor_types = get(Dt.ARMOR_TYPES) -- We copy this table. We could have copied ARMOR_RATING_WEIGHTS too, all that matters is that it includes all slots.
     -- Remove all slots with armor from the list. OnLY iF we hAvE ArMOr!!
     local armor = Fn.get_equipped('ARMOR')
-    if armor then for _, _obj in ipairs(armor) do Fn.clean_slots(types.Armor.record(_obj).type) end end
+    if armor then for _, _obj in ipairs(armor) do Fn.clean_slots(types.Armor.record(_obj).type, armor_types) end end
     local unarmored_slots = {}
     -- Add slots that didn't have armor to this new iterable, #ble table
     for _slot, _ in pairs(armor_types) do table.insert(unarmored_slots, _slot) end
     return unarmored_slots
 end
 
--- Fn.recent_activations = function(amount, source, simtime) -- unused
---     if not Dt.recent_activations[source] then
---         Dt.recent_activations[source] = {callback = source, counter = makecounter(0)}
---         Dt.recent_activations[source].callback = async:registerTimerCallback(Dt.recent_activations[source].callback, Dt.recent_activations[source].counter)
---     end
---     async:newSimulationTimer(simtime, Dt.recent_activations[source].callback, -amount)
---     return Dt.recent_activations[source].counter(amount)
--- end
+Fn.recent_activations = function(amount, source, simtime)
+    if not Dt.recent_activations[source] then
+        Dt.recent_activations[source] = {callback = source, counter = makecounter(0)}
+        Dt.recent_activations[source].callback = async:registerTimerCallback(Dt.recent_activations[source].callback, Dt.recent_activations[source].counter)
+    end
+    async:newSimulationTimer(simtime, Dt.recent_activations[source].callback, -amount)
+    return Dt.recent_activations[source].counter(amount)
+end
 
 Fn.estimate_base_damage = function(t) --{full = 0, spam = 0, speed = 0, min = 0, max = 0}
     if t.speed < t.full/5 then t.speed = (t.full + t.spam) / 1.66 end -- If 1st attack, then we set speed to a little less than average, since you're very likely to have fully drawn it.
