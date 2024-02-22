@@ -101,6 +101,26 @@ function getArmorType(armor_obj)
     end
 end
 
+-- Credit to Pharis for this one. I couldn't have made it, no chance in hell.
+local function getFacedObject()
+    local origin = camera.getPosition();
+    local direction = camera.viewportToWorldVector(util.vector2(0.5, 0.5));
+
+    local activationDistance = core.getGMST("iMaxActivateDist") + camera.getThirdPersonDistance();
+        local telekinesis = types.Actor.activeEffects(self):getEffect(core.magic.EFFECT_TYPE.Telekinesis);
+    if (telekinesis) then
+        activationDistance = activationDistance + (telekinesis.magnitude * 22);
+    end;
+
+    local result = nearby.castRenderingRay(
+        origin,
+        origin + direction * activationDistance,
+        { ignore = self }
+    );
+
+    if (result ~= nil and result.hit) then return result.hitObject; end;
+end;
+
 -- DEFINITIONS --
 -----------------------------------------------------------------------------------------------------------
 
@@ -136,31 +156,9 @@ Fn.register_Use_Action_Handler = function()
     input.registerActionHandler("Use", useCallback)
 end
 
-Fn.get_active_effect_mag = function(effectid)
-    local modifier = 0
-    for _id, _params in pairs(types.Actor.activeSpells(self)) do
-        if core.magic.spells[_params.id] then
-            for _, _effect in pairs(_params.effects) do if _effect.id == effectid then modifier = modifier + _effect.magnitudeThisFrame end end
-        end
-        if core.magic.enchantments[_params.id] then
-            for _, _effect in pairs(_params.effects) do if _effect.id == effectid then modifier = modifier + _effect.magnitudeThisFrame end end
-        end
-    end
-    return modifier
-end
+Fn.get_active_effect_mag = function(effectid) return types.Actor.activeEffects(self):getEffect(effectid).magnitude end
 
-Fn.has_effect = function(effect)
-    local haseffect = false
-    for _id, _params in pairs(types.Actor.activeSpells(self)) do
-        if core.magic.spells[_params.id] then
-            for _, _effect in pairs(_params.effects) do if _effect.id == effect then haseffect = true end end
-        end
-        if core.magic.enchantments[_params.id] then
-            for _, _effect in pairs(_params.effects) do if _effect.id == effect then haseffect = true end end
-        end
-    end
-    return haseffect
-end
+Fn.has_effect = function(effectid) return not (types.Actor.activeEffects(self):getEffect(effectid).magnitude == 0) end
 
 Fn.get_equipped_armor = function()
     local armor_list = {}
