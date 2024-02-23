@@ -3,6 +3,14 @@ local time  = require('openmw_aux.time')
 local core  = require('openmw.core')
 
 -- TOOLS
+local makecounter = function(val)
+    local count = val
+    return function(mod)
+        count = count + mod
+        return count
+    end
+end
+
 local function makeKeyEnum(keys)
 local result = {}
 for _, key in ipairs(keys) do
@@ -151,6 +159,9 @@ local Dt = {
         fMaxHandToHandMult   = core.getGMST('fMaxHandToHandMult'  ),
         fMinHandToHandMult   = core.getGMST('fMinHandToHandMult'  ),
         fHandtoHandHealthPer = core.getGMST('fHandtoHandHealthPer'),
+        fMinWalkSpeed        = core.getGMST('fMinWalkSpeed'       ), -- Currently unused, could be made to affect athletics formula but it seemed too convoluted.
+        fMaxWalkSpeed        = core.getGMST('fMaxWalkSpeed'       ), -- Same as previous, I aired on using a flat speed multiplier instead.
+        fEncumbranceStrMult  = core.getGMST('fEncumbranceStrMult' ),
     },
     GLOB = {
     WerewolfClawMult = 0
@@ -178,6 +189,7 @@ local Dt = {
     recent_activations = {},
     attackspeed = {current = 0, update = function(self) self.current = self.meter() end, meter = make_atkspeed_meter()},
     equipment = nil,
+    counters = {athletics = makecounter(0), acrobatics = makecounter(0)}
 }
 
 --[] Setup metatable inheritance for Dt.scalers || DOESNT WORK AND I DONT KNOW WHY

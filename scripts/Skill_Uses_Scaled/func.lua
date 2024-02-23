@@ -39,6 +39,22 @@ local HandToHand_Strength = 1/40 -- Hand to Hand xp per hit is multiplied by STR
                                  -- The default is what OpenMW's "Factor strength into hand-to-hand combat" setting uses.
 local H2H_STR_Werewolves = false -- If this is true, HandToHand_Strength will affect your xp as a werewolf.
 
+local Acrobatics_FP_Max = 3 -- With a full FP bar, your skill progress will be multiplied by [this].
+local Acrobatics_FP_Min = 0 -- With an empty FP bar, your skill progress will be multiplied by [this].
+                            -- | The multiplier goes down gradually, approaching FP_Min as your FP gets closer to empty.
+local Acrobatics_Encumbrance_Max = 0.5 -- At full carry weight, your skill progress will be multiplied by [this].
+local Acrobatics_Encumbrance_Min = 1.5  -- At empty carry weight, your skill progress will be multiplied by [this].
+                                        -- | Acrobatics is a Stealth skill, and this favours staying light an nimble.
+
+local Athletics_FP_Max = 3 -- With a full FP bar, your skill progress will be multiplied by [this].
+local Athletics_FP_Min = 0 -- With an empty FP bar, your skill progress will be multiplied by [this].
+                           -- | The multiplier goes down gradually, approaching FP_Min as your FP gets closer to empty.                                     -- | Acrobatics is a Stealth skill, and this favours staying light and agile.
+local Athletics_Encumbrance_Max = 1.5  -- At full carry weight, your skill progress will be multiplied by [this].
+local Athletics_Encumbrance_Min = 0.5 -- At empty carry weight, your skill progress will be multiplied by [this].
+                                       -- | Athletics is a Combat skill, and this favours carrying heavy gear into battle.
+
+
+
 -----------------------------------------------------------------------------------------------------------
 
 -- TOOLS
@@ -356,8 +372,6 @@ Fn.make_scalers = function()
             -- Armor skill and AR GMSTs are combined to make leveling below base AR faster, and above slower.
             local skill = types.Player.stats.skills.block(self).base
 
-            -- Scale XP:
-
             local multiplier = damage/Block_Damage_To_XP * (Dt.GMST.iBlockMaxChance+Dt.GMST.iBlockMinChance) / (2*Dt.GMST.iBlockMinChance + skill)
             xp = xp * multiplier
 
@@ -371,10 +385,6 @@ Fn.make_scalers = function()
 -----------------------------------------------------------------------------------------------------------
     Dt.scalers:new{ name = 'unarmored', 
         func = function(xp)
-
-
-            -- Calculate factors:
-
             local armor_weight = 0
             local armor = Fn.get_equipped('ARMOR')
             -- Only calculate armor if there is armor, oR eLSE. >:|
@@ -386,8 +396,6 @@ Fn.make_scalers = function()
             local skill        = types.Player.stats.skills['unarmored'](self).base
             local rating       = skill * Dt.GMST.fUnarmoredBase1 * skill * Dt.GMST.fUnarmoredBase2
             local skill_factor = 100 / (35 + rating + skill + armor_weight * Unarmored_Armor_Mult) -- Rating is added here alongside skill, because unarmored has exponential scaling baked in.
-
-            -- Scale XP:
 
             local multiplier = skill_factor * beast_factor * gank_factor
             local xp = xp * multiplier
@@ -403,9 +411,6 @@ Fn.make_scalers = function()
     for _, _skillid in ipairs(Dt.scaler_groups.SPELL) do
         Dt.scalers:new{ name = _skillid, 
             func = function(xp)
-
-                -- Scale XP:
-
                 local mp_factor = 0.01*Fn.get_active_effect_mag('fortifymagicka') + 0.1*Fn.get_active_effect_mag('fortifymaximummagicka')
                 local spell_cost = types.Actor.getSelectedSpell(self).cost
                 local multiplier = spell_cost/Magicka_to_XP * 4.8/(4 + mp_factor)
@@ -414,23 +419,21 @@ Fn.make_scalers = function()
                 print('SUS [Magic] XP Mult: '.. printify(multiplier)..' | Skill Progress: '..percentify(xp)..' | Spell Cost: '.. printify(spell_cost))
 
                 -- MP Refund:
-                                            -- Calculate factors
                 local armor_weight = 0
-                for _, _obj in ipairs(Fn.get_equipped('ARMOR')) do armor_weight = armor_weight + types.Armor.record(_obj).weight end
+                local armor = Fn.get_equipped('ARMOR')
+                if armor then for _, _obj in ipairs(armor) do armor_weight = armor_weight + types.Armor.record(_obj).weight end end
                 local armor_offset = armor_weight * MP_Refund_Armor_Mult
                 local cost_factor = Magicka_to_XP / (Magicka_to_XP + spell_cost/Magicka_to_XP)
                 local skill = types.Player.stats.skills[_skillid](self).base
                 local skill_factor = (skill - MP_Refund_Skill_Offset - armor_offset) / (40 + skill)
 
-                                            -- Calculate refund
                 local refund = spell_cost * cost_factor * skill_factor * 0.01*MP_Refund_Max_Percent
 
-                                            -- Apply refund
                 --Yes, this will apply even if current > max.
                 --To keep vanilla compatibility, we have to consider current>max as a valid gameplay state, since Fortify Magicka doesn't increase Max MP.
                 types.Player.stats.dynamic.magicka(self).current = types.Player.stats.dynamic.magicka(self).current + refund
 
-                print('SUS - Refund: '.. printify(refund*100)..'% | '.. printify(refund) ..' MP')
+                print('SUS - Refund: '.. printify(refund*10)..'% | '.. printify(refund) ..' MP')
 
                 return xp
             end
@@ -465,7 +468,6 @@ Fn.make_scalers = function()
                     wp_obj:sendEvent('modifyCondition', codition_delta)
                 end
 
-
                 -- NOTE: due to durability being an integer, you only lose more than 1 when dealing over 20 damage (unless you have changed your Durability GMST).
                 -- To deal with this, we use a different formula when your weapon deals under 20 damage.
                 -- If you have the Weapon-XP-Precision addon, this only gets used under 5 damage instead.
@@ -484,12 +486,10 @@ Fn.make_scalers = function()
                         return wp[atk..'MinDamage'], wp[atk..'MaxDamage']
                     end
                     local mindamage, maxdamage = getBestAttack(weapon.object)
-                    damage = Fn.estimate_base_damage{speed = Dt.attackspeed.current, full = 0.85*speed_factor, spam = 1.45*speed_factor,
-                                                     min = getMinDamage(mindamage), max = getMinDamage(maxdamage)}
+                    damage = Fn.estimate_base_damage{speed = Dt.attackspeed.current, full = 0.85*speed_factor, spam = 1.45*speed_factor, min = getMinDamage(mindamage), max = getMinDamage(maxdamage)}
                 end
-                -- Scale XP:
-
                 local skill = types.Player.stats.skills[_skillid](self).base
+
                 --NOTE: due to durability being an integer, this will only change in steps of 10 damage (unless you have changed your Durability GMST).
                 -- If you have the Weapon-XP-Precision addon, this increases in steps of 2.5 damage instead.
                 local multiplier = damage/speed_factor/Physical_Damage_to_XP * 80/(40 + skill)
@@ -505,24 +505,21 @@ Fn.make_scalers = function()
 -----------------------------------------------------------------------------------------------------------        Dt.scalers:new{ name = 'marksman', 
     Dt.scalers:new{ name = 'marksman', 
         func = function(xp)
-            -- Mostly the same as MELEE, but we an abridged alternate formula for throwables and different Dt values for bows & crossbows
             local bow    = Fn.get_equipped('BOW')
             local ammo   = Dt.pc_ammo
             local thrown = Dt.pc_thrown
             local wp     = nil -- This is to set scope only.
             local damage = nil -- This is to set scope only.
-            
             -- Bow / Crossbow Scaler
             if bow then
                 -- If we have a bow but don't remember the last used ammo for whatever reason, skip scaling.
                 if not ammo then print('SUS - No Ammo in Dt.pc_ammo') return xp end
                 -- If bow and disintegrate we skip. Note we DON'T skip throwables, only bows/crossbows.
-                -- Throwables don't care about durability, nor disintegrate whatever.
+                -- Throwables don't care about durability, nor disintegrate whatsoever.
                 if Fn.has_effect('disintegrateweapon') then return xp end 
-                
+
                 local condition_lost = Dt.pc_bow.condition - bow.condition
                 damage = condition_lost/Dt.GMST.fWeaponDamageMult
-                
                 local wp_obj = bow.object
                 wp = types.Weapon.record(wp_obj)
                 -- If you have the Weapon-XP-Precision addon, we add weapon.lua to your weapon.
@@ -539,7 +536,6 @@ Fn.make_scalers = function()
                     local function getMinDamage(val) return math.max(1, math.min(min_cond_dmg, val * str_mod * condition_mod)) end
                     damage = Fn.estimate_base_damage{speed = Dt.attackspeed.current, full = 0.5, spam = 0.75, min = getMinDamage(wp.chopMinDamage), max = getMinDamage(wp.chopMaxDamage)}
                 end
-                
             -- Thrown Weapon Scaler
             elseif thrown then 
                 wp = types.Weapon.record(thrown)
@@ -554,10 +550,9 @@ Fn.make_scalers = function()
             -- If we got here, we have a valid weapon and damage number, and should apply scaling.
             end
 
-            -- Scale XP:
-
             local speed_factor = 0.5 + wp.speed/2
             local skill = types.Player.stats.skills['marksman'](self).base
+
             --NOTE: due to durability being an integer, this will only change in steps of 10 damage (unless you have changed your Durability GMST).
             -- If you have the Weapon-XP-Precision addon, this increases in steps of 2.5 damage instead.
             local multiplier = damage/speed_factor/Physical_Damage_to_XP * 80/(40 + skill)
@@ -588,7 +583,6 @@ Fn.make_scalers = function()
             -- It's the best method I could think of to balance the fact that H2H goes through 2 different healthbars at 2 different rates
             -- ..while also keeping compatibility with mods that change H2H GMSTs.
             local damage = (damage + damage * Dt.GMST.fHandtoHandHealthPer)/2
-            -- Scale XP:
 
             local multiplier = damage/Physical_Damage_to_XP * 80/(40 + skill)
             xp = xp * multiplier
@@ -600,21 +594,35 @@ Fn.make_scalers = function()
     }
     Dt.scalers:new{ name = 'acrobatics', 
         func = function(xp)
-            
-            local multiplier = 1
+            local fatigued_mult   = Acrobatics_FP_Min + (Acrobatics_FP_Max - Acrobatics_FP_Min)
+                                    * types.Actor.stats.dynamic.fatigue(self).current / types.Actor.stats.dynamic.fatigue(self).base
+            local encumbered_mult = Acrobatics_Encumbrance_Min + (Acrobatics_Encumbrance_Max - Acrobatics_Encumbrance_Min)
+                                    * types.Actor.getEncumbrance(self) / (Dt.GMST.fEncumbranceStrMult * types.Player.stats.attributes.strength(self).base)
+
+            local multiplier = fatigued_mult * encumbered_mult -- No fatigue% => no XP, and more weight% == less XP
             xp = xp * multiplier
 
+--             local printcounter = Dt.counters.acrobatics(1)
+--             print(printcounter)
             print('SUS [Acrobatics] XP Mult: '.. printify(multiplier)..' | Skill Progress: '..percentify(xp)..' | : '.. printify(0))
             return xp
         end
     }
     Dt.scalers:new{ name = 'athletics', 
         func = function(xp)
-            
-            local multiplier = 1
+            local fatigued_mult   = Athletics_FP_Min + (Athletics_FP_Max - Athletics_FP_Min)
+                                    * types.Actor.stats.dynamic.fatigue(self).current / types.Actor.stats.dynamic.fatigue(self).base
+            local encumbered_mult = Athletics_Encumbrance_Min + (Athletics_Encumbrance_Max - Athletics_Encumbrance_Min)
+                                    * types.Actor.getEncumbrance(self) / (Dt.GMST.fEncumbranceStrMult * types.Player.stats.attributes.strength(self).base)
+
+            local multiplier = fatigued_mult * encumbered_mult -- No fatigue% => no XP, and more weight% == more XP
             xp = xp * multiplier
 
-            print('SUS [Athletics] XP Mult: '.. printify(multiplier)..' | Skill Progress: '..percentify(xp)..' | : '.. printify(0))
+            local printcounter = Dt.counters.athletics(1)
+            if printcounter > 9.01 then
+                print('SUS [Athletics] XP Mult: '.. printify(multiplier)..' | Skill Progress: '..percentify(xp * printcounter)..' | FP: '.. percentify(types.Actor.stats.dynamic.fatigue(self).current / types.Actor.stats.dynamic.fatigue(self).base))
+                Dt.counters.athletics(-printcounter)
+            end
             return xp
         end
     }
@@ -624,7 +632,7 @@ Fn.make_scalers = function()
             local multiplier = 1
             xp = xp * multiplier
 
-            print('SUS [Security] XP Mult: '.. printify(multiplier)..' | Skill Progress: '..percentify(xp)..' | : '.. printify(0))
+            print('SUS [Security] XP Mult: '.. printify(multiplier)..' | Skill Progress: '..percentify(xp)..' | FP: '.. percentify(types.Actor.stats.dynamic.fatigue(self).current / types.Actor.stats.dynamic.fatigue(self).base))
             return xp
         end
     }
