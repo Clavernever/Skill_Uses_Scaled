@@ -21,6 +21,7 @@ end
 local armor = nil                   -- create here instead of every frame
 local equipped_armor_thisframe = {} -- create here instead of every frame
 local onUpdate = function(dt)
+--     if Dt.counters.frame(0) > -1 and Dt.counters.frame(0) < 3 then print(Dt.counters.frame(1)) else Dt.counters.frame(-Dt.counters.frame(0) -1) end
     -- if Dt.STANCE_WEAPON[types.Actor.getStance(self)] then Fn.get_weapon_data() end  -- We do this with an action handler now, so it's not needed here.
     equipped_armor_thisframe = {}
     armor = Fn.get_equipped('ARMOR')
@@ -31,13 +32,23 @@ local onUpdate = function(dt)
     end
     Dt.pc_equipped_armor_condition:set_prevframe(equipped_armor_thisframe)
 end
-
+local onFrame = function(dt)
+    if Dt.security_ing then
+        Fn.get_security_target()
+        local printcounter = Dt.counters.security(1)
+        if printcounter > 150.01 then
+            print('Scanning lockables...')
+            Dt.counters.security(-printcounter)
+        end
+    end
+end
 return {
     engineHandlers = {
         onActive = onActive,
         onUpdate = onUpdate,
+        onFrame  = onFrame ,
     },
     eventHandlers = {
-    SUS_updateGLOBvar = function(t) Dt.GLOB[t.id] = t.val end
+        SUS_updateGLOBvar = function(t) Dt.GLOB[t.id] = t.val end
     }
 }

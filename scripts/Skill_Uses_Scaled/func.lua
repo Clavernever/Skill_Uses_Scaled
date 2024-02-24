@@ -1,11 +1,13 @@
-local core  = require('openmw.core')
-local self  = require('openmw.self')
-local types = require('openmw.types')
-local async = require('openmw.async')
-local time  = require('openmw_aux.time')
-local i_UI  = require('openmw.interfaces').UI
-local input = require('openmw.input')
-
+local core   = require('openmw.core')
+local self   = require('openmw.self')
+local types  = require('openmw.types')
+local async  = require('openmw.async')
+local time   = require('openmw_aux.time')
+local i_UI   = require('openmw.interfaces').UI
+local input  = require('openmw.input')
+local camera = require('openmw.camera')
+local util   = require('openmw.util')
+local nearby = require('openmw.nearby')
 local Dt = require('scripts.Skill_Uses_Scaled.data')
 
 -- SETTINGS -- They are all flat multipliers
@@ -49,10 +51,12 @@ local Acrobatics_Encumbrance_Min = 1.5  -- At empty carry weight, your skill pro
 local Athletics_FP_Max = 3 -- With a full FP bar, your skill progress will be multiplied by [this].
 local Athletics_FP_Min = 0 -- With an empty FP bar, your skill progress will be multiplied by [this].
                            -- | The multiplier goes down gradually, approaching FP_Min as your FP gets closer to empty.                                     -- | Acrobatics is a Stealth skill, and this favours staying light and agile.
-local Athletics_Encumbrance_Max = 1.5  -- At full carry weight, your skill progress will be multiplied by [this].
+local Athletics_Encumbrance_Max = 1.5 -- At full carry weight, your skill progress will be multiplied by [this].
 local Athletics_Encumbrance_Min = 0.5 -- At empty carry weight, your skill progress will be multiplied by [this].
-                                       -- | Athletics is a Combat skill, and this favours carrying heavy gear into battle.
-
+                                      -- | Athletics is a Combat skill, and this favours carrying heavy gear into battle.
+local Security_Lock_Points_To_XP = 20 -- [This] many lock points are equivalent of one vanilla Security use (vanilla triggers a use whenever you open a lock of any level).
+local Security_Trap_Points_To_XP = 20 -- [This] much trap spell cost is equivalent to one vanilla Security use (vanilla triggers a use whenever you open a lock of any level).
+                                      -- | Trap difficulty is equivalent to it's spell cost.
 
 
 -----------------------------------------------------------------------------------------------------------
@@ -61,7 +65,7 @@ local Athletics_Encumbrance_Min = 0.5 -- At empty carry weight, your skill progr
 local eps = 0.001
 function equal(a,b)          return (math.abs(b - a) < eps)                                  end
 
-local function printify(num) return math.floor(num*100 + 0.5)/100 end
+local function printify(num) return math.floor(num*1000 + 0.5)/1000 end
 local function percentify(num)
     stringnum = 'nopercent?'
     if      num >= 10  then stringnum = tostring(math.floor(num*100 + 0.5)..'%')
@@ -144,37 +148,80 @@ local Fn = {}
 
 -----------------------------------------------------------------------------------------------------------
 Fn.register_Use_Action_Handler = function()
-    local useCallback = async:callback(function()
+    local useCallback = async:callback(
+        function()
             if input.getBooleanActionValue("Use") then
                 -- If in a menu or not in weapon stance, we're not attacking so we go back
                 if i_UI.getMode() or not Dt.STANCE_WEAPON[types.Actor.getStance(self)] then return end
                 local weapon = types.Actor.getEquipment(self, Dt.SLOTS.WEAPON)
                 if not weapon then
-                    Dt.attackspeed:update()                                          -- Fn.recent_activations(1, 'h2h', 3.1)
+                    Dt.drawtime:update(true)                                          -- Fn.recent_activations(1, 'h2h', 3.1)
+                    Dt.attackspeed:update()
                     -- We request global.lua to request core.lua to update data.lua with the current WerewolfClawMult.
                     -- We do it here cause it needs 2 frames to resolve due to event delay, and this handler happens ~10 frames before the hit registers and calls the skill handler.
                     -- Even if the skill handler got called by another mod completely outside this timeframe, the worst that could happen is that it uses an outdated WerewolfClawMult.
                     if types.NPC.isWerewolf(self) then core.sendGlobalEvent('SUS_updateGLOBvar', {source = self.obj, id = 'WerewolfClawMult'}) end
-                elseif not (weapon.type == types.Weapon) then return -- Security-related things, and anything else that doesn't use a weapon, will go here when it's added.
+                elseif (weapon.type == types.Lockpick) or (weapon.type == types.Probe) then
+                    pc_security_target = Fn.get_security_target()
+                    Dt.security_ing = true
+                elseif not (weapon.type == types.Weapon) then return -- skip for anything else that doesn't use a weapon.
+                elseif Dt.WEAPON_TYPES.MELEE[types.Weapon.record(weapon).type]    then
+                    Dt.drawtime:update(true)
+                    Dt.attackspeed:update()
+                elseif Dt.WEAPON_TYPES.BOW[types.Weapon.record(weapon).type]      then
+                    Dt.drawtime:update(true)
+                    Dt.attackspeed:update()
+                elseif Dt.WEAPON_TYPES.THROWING[types.Weapon.record(weapon).type] then
+                    Dt.drawtime:update(true)                                          -- Fn.recent_activations(1, 'thrown', 3.1)
+                    Dt.attackspeed:update()
+                end
+            else
+                if i_UI.getMode() or not Dt.STANCE_WEAPON[types.Actor.getStance(self)] then return end
+                local weapon = types.Actor.getEquipment(self, Dt.SLOTS.WEAPON)
+                if not weapon then
+                    Dt.drawtime:update(false)                                          -- Fn.recent_activations(1, 'h2h', 3.1)
+                    print('atkspd: '..printify(Dt.attackspeed.current)..' | drawframes: '..Dt.drawtime.current)
+                    -- We do this again here, just in case it helps.
+                    if types.NPC.isWerewolf(self) then core.sendGlobalEvent('SUS_updateGLOBvar', {source = self.obj, id = 'WerewolfClawMult'}) end
+                elseif (weapon.type == types.Lockpick) or (weapon.type == types.Probe) then
+                    Dt.security_ing = false
+                elseif not (weapon.type == types.Weapon) then return -- skip for anything else that doesn't use a weapon.
                 elseif Dt.WEAPON_TYPES.MELEE[types.Weapon.record(weapon).type]    then
                     Dt.pc_held_weapon_condition = Fn.get_equipped('MELEE').condition --:set_prevframe(Fn.get_equipped('MELEE').condition)
-                    Dt.attackspeed:update()
+                    Dt.drawtime:update(false)
+                    print('atkspd: '..printify(Dt.attackspeed.current)..' | drawframes: '..Dt.drawtime.current)
                 elseif Dt.WEAPON_TYPES.BOW[types.Weapon.record(weapon).type]      then
                     Dt.pc_bow                   = Fn.get_equipped('BOW')             --:set_prevframe(Fn.get_equipped('BOW'))
                     if types.Actor.getEquipment(self, Dt.SLOTS.AMMO) then Dt.pc_ammo = Fn.get_equipped('AMMO') end
-                    Dt.attackspeed:update()
+                    Dt.drawtime:update(false)
+                    print('atkspd: '..printify(Dt.attackspeed.current)..' | drawframes: '..Dt.drawtime.current)
                 elseif Dt.WEAPON_TYPES.THROWING[types.Weapon.record(weapon).type] then
                     Dt.pc_thrown                = Fn.get_equipped('THROWING').object
-                    Dt.attackspeed:update()                                          -- Fn.recent_activations(1, 'thrown', 3.1)
+                    Dt.drawtime:update(false)                                          -- Fn.recent_activations(1, 'thrown', 3.1)
+                    print('atkspd: '..printify(Dt.attackspeed.current)..' | drawframes: '..Dt.drawtime.current)
                 end
             end
-        end)
+        end
+    )
     input.registerActionHandler("Use", useCallback)
 end
 
 Fn.get_active_effect_mag = function(effectid) return types.Actor.activeEffects(self):getEffect(effectid).magnitude end
 
 Fn.has_effect = function(effectid) return not (types.Actor.activeEffects(self):getEffect(effectid).magnitude == 0) end
+
+Fn.get_security_target = function()
+    local target = getFacedObject()
+    local lockable = nil -- scopeset
+    if target and (target.type == types.Door or target.type == types.Container) then
+        lockable = {}
+        lockable.islocked = types.Lockable.isLocked(target)
+        lockable.level    = types.Lockable.getLockLevel(target)
+        lockable.trap     = types.Lockable.getTrapSpell(target)
+        print('Locked? '..tostring(lockable.islocked)..' | Lvl: '..tostring(lockable.level)..' | Trap: '..tostring(lockable.trap))
+    end
+    return lockable
+end
 
 Fn.get_equipped_armor = function()
     local armor_list = {}
@@ -319,10 +366,13 @@ Fn.recent_activations = function(amount, source, simtime)
 end
 
 Fn.estimate_base_damage = function(t) --{full = 0, spam = 0, speed = 0, min = 0, max = 0}
-    if t.speed < t.full/5 then t.speed = (t.full + t.spam) / 1.66 end -- If 1st attack, then we set speed to a little less than average, since you're very likely to have fully drawn it.
-    local draw = math.min(1, math.max(0, (t.spam - t.speed)/(t.spam - t.full))) -- Now we get draw% (normalised from 0 to 1)
+                    -- Behold: horrribleness that works:
+    local speed = Dt.attackspeed.current
+    if Dt.drawtime.current > t.hold then speed = t.min -- If hold click too long, force a full draw.
+    elseif Dt.drawtime.current < t.tap then speed = t.max -- If tap, force spam.
+    end -- And if we're somewhere in between, we let the other formula take over cause it's better:
+    local draw = math.min(1, math.max(0, (t.spam - speed)/(t.spam - t.full))) -- Now we get draw% (normalised from 0 to 1)
     local damage = t.min + (t.max - t.min) * draw
---     print(printify(t.speed)..' | '..printify(draw))
     return damage
 end
 Fn.make_scalers = function()
@@ -333,7 +383,7 @@ Fn.make_scalers = function()
         Dt.scalers:new{
             name = _skillid,
             func = function(xp)
-                -- NOTE: We disable scaling while under the effect of Disintegrate Armor, for you'd get ridiculous amounts of XP otherwise.
+                -- We disable scaling while under the effect of Disintegrate Armor, for you'd get ridiculous amounts of XP otherwise.
                 -- For the sake of robustness and simplicity, it's a tradeoff I'm willing to accept. I will NOT attempt to fix it.
                 if Fn.has_effect('disintegratearmor') then return xp end
                 local armor_obj = Fn.get_hit_armorpiece()
@@ -351,6 +401,9 @@ Fn.make_scalers = function()
 
                 print('SUS [Armor] XP Mult: '.. printify(multiplier)..' | Skill Progress: '..percentify(xp)..' | Damage Received: '.. printify(damage))
 
+                -- We also add a hit for Unarmored's timer, so that having a couple empty pieces doesn't result in massive unarmored bonuses.
+                Fn.recent_activations(1, 'unarmored', Unarmored_Hit_Timer)
+
                 return xp
             end
         }
@@ -360,7 +413,7 @@ Fn.make_scalers = function()
 -----------------------------------------------------------------------------------------------------------
     Dt.scalers:new{ name = 'block',
         func = function(xp)
-            -- NOTE: We disable scaling while under the effect of Disintegrate Armor, for you'd get ridiculous amounts of XP otherwise.
+            -- We disable scaling while under the effect of Disintegrate Armor, for you'd get ridiculous amounts of XP otherwise.
             -- For the sake of robustness and simplicity, it's a tradeoff I'm willing to accept. I will NOT attempt to fix it.
             if Fn.has_effect('disintegratearmor') then return xp end
             local armor_obj = types.Actor.getEquipment(self, Dt.SLOTS.SHIELD)
@@ -376,6 +429,8 @@ Fn.make_scalers = function()
             xp = xp * multiplier
 
             print('SUS [Block] XP Mult: '.. printify(multiplier)..' | Skill Progress: '..percentify(xp)..' | Damage Received: '.. printify(damage))
+
+            -- Note we DON'T add an unarmored hit down here. You fully blocked, took no damage and gained no armor skill xp, so it doesn't count as a hit in my books.
 
             return xp
         end
@@ -400,7 +455,7 @@ Fn.make_scalers = function()
             local multiplier = skill_factor * beast_factor * gank_factor
             local xp = xp * multiplier
 
-            print('SUS [Unarmored] XP Mult: '.. printify(multiplier)..' | Skill Progress: '..percentify(xp))
+            print('SUS [Unarmored] XP Mult: '.. printify(multiplier)..' | Skill Progress: '..percentify(xp)..' | Hit Counter: '..Dt.recent_activations['unarmored'].counter(0))
 
             return xp
         end
@@ -486,7 +541,9 @@ Fn.make_scalers = function()
                         return wp[atk..'MinDamage'], wp[atk..'MaxDamage']
                     end
                     local mindamage, maxdamage = getBestAttack(weapon.object)
-                    damage = Fn.estimate_base_damage{speed = Dt.attackspeed.current, full = 0.85*speed_factor, spam = 1.45*speed_factor, min = getMinDamage(mindamage), max = getMinDamage(maxdamage)}
+                    local draw_factor = speed_factor + 0.5
+                    damage = Fn.estimate_base_damage{full = 0.85*speed_factor, spam = 1.45*speed_factor, max = getMinDamage(maxdamage),
+                                                     hold = 0.85*draw_factor ,  tap = 1.45*draw_factor , min = getMinDamage(mindamage)}
                 end
                 local skill = types.Player.stats.skills[_skillid](self).base
 
@@ -534,7 +591,8 @@ Fn.make_scalers = function()
                     local str_mod = types.Player.stats.attributes.strength(self).base * Dt.GMST.fDamageStrengthMult / 10 + Dt.GMST.fDamageStrengthBase
                     local condition_mod = bow.condition/types.Weapon.record(bow.object).health
                     local function getMinDamage(val) return math.max(1, math.min(min_cond_dmg, val * str_mod * condition_mod)) end
-                    damage = Fn.estimate_base_damage{speed = Dt.attackspeed.current, full = 0.5, spam = 0.75, min = getMinDamage(wp.chopMinDamage), max = getMinDamage(wp.chopMaxDamage)}
+                    damage = Fn.estimate_base_damage{full = 0.5, spam = 0.75, min = getMinDamage(wp.chopMinDamage),
+                                                     hold = 120,  tap = 40  , max = getMinDamage(wp.chopMaxDamage)}
                 end
             -- Thrown Weapon Scaler
             elseif thrown then 
@@ -543,7 +601,7 @@ Fn.make_scalers = function()
                 -- Now we use our handy attack draw estimation along with min and max damage to (hopefully) get your real damage (mostly) right.
                 -- full = 0.9 -- config point. Less than this is  a full draw or 1st click.
                 -- spam = 1.45 -- config point. More than this is spam clicking.
-                damage = Fn.estimate_base_damage{speed = Dt.attackspeed.current, full = 0.9, spam = 1.45, min = wp.chopMinDamage, max = wp.chopMaxDamage}
+                damage = Fn.estimate_base_damage{hold = 40, tap = 9, full = 0.9, spam = 1.45, min = wp.chopMinDamage, max = wp.chopMaxDamage}
                 damage = damage * str_mod * 2 -- Gotta account for chonk stronk & for thrown weaponns being both weapon and ammo
             -- If we don't have a bow but somehow don't remember last throwable either, also skip.
             else print('SUS - No Ammo in Dt.pc_ammo') return xp
@@ -576,7 +634,7 @@ Fn.make_scalers = function()
                 claw = Dt.GLOB.WerewolfClawMult
                 if H2H_STR_Werewolves then claw = claw * str_mod end
             end
-            local damage_per_skillpoint = Fn.estimate_base_damage{speed = Dt.attackspeed.current, full = 0.9, spam = 1.9, min = Dt.GMST.fMinHandToHandMult, max = Dt.GMST.fMaxHandToHandMult}
+            local damage_per_skillpoint = Fn.estimate_base_damage{hold = 40, tap = 9, full = 0.9, spam = 1.9, min = Dt.GMST.fMinHandToHandMult, max = Dt.GMST.fMaxHandToHandMult}
             local skill = types.Player.stats.skills['handtohand'](self).base -- Note we don't count fortifies. This prevents sujama from murdering your XP rates.
             local damage = (damage_per_skillpoint * skill) * str_mod + claw
             -- Now we average your fatigue damage and your health damage.
@@ -604,7 +662,7 @@ Fn.make_scalers = function()
 
 --             local printcounter = Dt.counters.acrobatics(1)
 --             print(printcounter)
-            print('SUS [Acrobatics] XP Mult: '.. printify(multiplier)..' | Skill Progress: '..percentify(xp)..' | : '.. printify(0))
+            print('SUS [Acrobatics] XP Mult: '.. printify(multiplier)..' | Skill Progress: '..percentify(xp)..' | FP: '.. percentify(types.Actor.stats.dynamic.fatigue(self).current / types.Actor.stats.dynamic.fatigue(self).base))
             return xp
         end
     }
@@ -628,11 +686,13 @@ Fn.make_scalers = function()
     }
     Dt.scalers:new{ name = 'security', 
         func = function(xp)
+            print(usetype) -- Not in scope, must add to scaler:new args
+            
 
             local multiplier = 1
             xp = xp * multiplier
 
-            print('SUS [Security] XP Mult: '.. printify(multiplier)..' | Skill Progress: '..percentify(xp)..' | FP: '.. percentify(types.Actor.stats.dynamic.fatigue(self).current / types.Actor.stats.dynamic.fatigue(self).base))
+            print('SUS [Security] XP Mult: '.. printify(multiplier)..' | Skill Progress: '..percentify(xp)..' | Lock Level: '..'??')
             return xp
         end
     }

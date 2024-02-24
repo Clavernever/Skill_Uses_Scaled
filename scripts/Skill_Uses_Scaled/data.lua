@@ -43,6 +43,23 @@ local function make_atkspeed_meter()
     end
 end
 
+local function make_draw_meter()
+    local simseconds = function() return core.getSimulationTime() - (core.getSimulationTime() % 0.001 * time.second) end
+    local atkbegin   = simseconds()
+    local atkend  = simseconds()
+    local atkspd  = 0
+    return function(start)
+        if start then 
+            atkbegin = simseconds()
+        else
+--         print('Attackspeed: '.. printify(1/(current - last))) --- core.getGameTime() % time.second - start)
+            atkend = simseconds()
+            atkspd = math.floor((atkend - atkbegin)*75 + 0.5)
+        end
+        return atkspd
+    end
+end
+
 local function get(var) -- var must be serializable, recursions WILL stack overflow :D
     if type(var)  ~= 'table' then return var
     else
@@ -60,7 +77,8 @@ local Dt = {
     pc_bow    = {itemid = '_id', object = '_obj', condition = 0}, --{set_prevframe = setpreviousval('prevframe', {itemid = '_id', object = '_obj', condition = 0}), },
     pc_ammo   = '_obj', --Always points directly at an object. -- Currently unused, since bow/crossbow durability loss includes ammo damage.
     pc_thrown = '_obj', --Same as ammo, but we keep track separately because they can be simultaneously equipped (even though thrown weapons are always their own ammo)
-    pc_level = 0,
+    pc_lock   = '_obj',
+    pc_trap   = '_obj',
 -- Engine Data
     WEAPON_TYPES = {
         MELEE = {
@@ -188,8 +206,10 @@ local Dt = {
     has_precision_addon = false,
     recent_activations = {},
     attackspeed = {current = 0, update = function(self) self.current = self.meter() end, meter = make_atkspeed_meter()},
+    drawtime    = {current = 0, update = function(self, start) if start then self.meter(start) else self.current = self.meter(start) end end, meter = make_draw_meter()},
     equipment = nil,
-    counters = {athletics = makecounter(0), acrobatics = makecounter(0)}
+    counters = {athletics = makecounter(0), acrobatics = makecounter(0), frame = makecounter(0), security = makecounter(0)},
+    security_ing = false,
 }
 
 --[] Setup metatable inheritance for Dt.scalers || DOESNT WORK AND I DONT KNOW WHY
