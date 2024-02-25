@@ -187,7 +187,7 @@ Fn.register_Use_Action_Handler = function()
                         -- We do it here cause it needs 2 frames to resolve due to event delay, and this handler happens ~10 frames before the hit (and thus the skill handler).
                         if types.NPC.isWerewolf(self) then core.sendGlobalEvent('SUS_updateGLOBvar', {source = self.obj, id = 'WerewolfClawMult'}) end
                     elseif (weapon.type == types.Lockpick) or (weapon.type == types.Probe) then
-                        pc_security_target = Fn.get_security_target()
+                        Dt.pc.security_target = Fn.get_security_target()
                         Dt.securiting = true -- We make onFrame scan continuously in case the player starts without a valid target and moves their cursor to one while holding click down.
                     end
                 end
@@ -220,7 +220,6 @@ Fn.get_security_target = function()
         lockable.islocked = types.Lockable.isLocked(target)
         lockable.level    = types.Lockable.getLockLevel(target)
         lockable.trap     = types.Lockable.getTrapSpell(target)
-        print('Locked? '..tostring(lockable.islocked)..' | Lvl: '..tostring(lockable.level)..' | Trap: '..tostring(lockable.trap))
     end
     return lockable
 end
@@ -489,19 +488,23 @@ Fn.make_scalers = function()
     Dt.scalers:new{ name = 'security', 
         func = function(useType, xp)
 
-            local target = pc_security_target
+            local target = Dt.pc.security_target
             if not target then
                 print('SUS - Targeted Door/Container not found, returning vanilla xp')
                 return xp
             end
-            -- Lockpicking scaler
-            if (useType == skp.SKILL_USE_TYPES.Security_PickLock) and Dt.pc.security_target.locked then
-                print('Lock Picked!')
+            local security_print = ''
+            local multiplier = 1
+            if (useType == skp.SKILL_USE_TYPES.Security_PickLock) and Dt.pc.security_target.islocked then
+                multiplier = target.level/Cfg.Security_Lock_Points_To_XP
+                security_print = 'Lock Level: '..target.level
+            elseif (useType == skp.SKILL_USE_TYPES.Security_DisarmTrap) and Dt.pc.security_target.trap then
+                multiplier = target.trap.cost/Cfg.Security_Trap_Points_To_XP
+                security_print = 'Trap Level: '..target.trap.cost
             end
 
-            local multiplier = 1
             xp = xp * multiplier
-            if Cfg.SUS_DEBUG then print('SUS [Security] Skill Uses: '.. printify(multiplier)..' | Skill Progress: '..percentify(xp)..' | Lock Level: '..'??') end
+            if Cfg.SUS_DEBUG then print('SUS [Security] Skill Uses: '.. printify(multiplier)..' | Skill Progress: '..percentify(xp)..' | '..security_print) end
             return xp
         end
     }
