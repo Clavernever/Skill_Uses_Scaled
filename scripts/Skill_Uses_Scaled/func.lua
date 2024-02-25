@@ -158,7 +158,7 @@ function Fn.get_attack(groupname, key)
                 Dt.pc.attack.damage = math.max(1, Fn.get_H2H_damage(draw))
             end
             Dt.pc.attack.step = 0
-            print(groupname..' | Damage: '..printify(Dt.pc.attack.damage)..' | Draw: '..percentify(draw)..' | Key:'..key)
+--             print(groupname..' | Damage: '..printify(Dt.pc.attack.damage)..' | Draw: '..percentify(draw)..' | Key:'..key)
         end
     end
 end
@@ -182,7 +182,7 @@ Fn.register_Use_Action_Handler = function()
                     Dt.pc.spell = types.Actor.getSelectedSpell(self)
                 elseif Dt.STANCE.WEAPON[types.Actor.getStance(self)] then
                     local weapon = types.Actor.getEquipment(self, Dt.SLOTS.WEAPON)
-                    if not weapon then -- Unarmored
+                    if not weapon then -- H2H
                         -- We request global.lua to request core.lua to update data.lua with the current WerewolfClawMult.
                         -- We do it here cause it needs 2 frames to resolve due to event delay, and this handler happens ~10 frames before the hit (and thus the skill handler).
                         if types.NPC.isWerewolf(self) then core.sendGlobalEvent('SUS_updateGLOBvar', {source = self.obj, id = 'WerewolfClawMult'}) end
@@ -194,7 +194,7 @@ Fn.register_Use_Action_Handler = function()
             else
                 if Dt.STANCE.WEAPON[types.Actor.getStance(self)] then
                     local weapon = types.Actor.getEquipment(self, Dt.SLOTS.WEAPON)
-                    if not weapon or (weapon.type == types.Weapon) then -- Unarmored
+                    if not weapon or (weapon.type == types.Weapon) then -- H2H
                         if i_UI.getMode() then async:newSimulationTimer(0, Fn.set_hit_release_callback, nil)
                         else Fn.set_hit_release() end
                     elseif (weapon.type == types.Lockpick) or (weapon.type == types.Probe) then -- Security
@@ -429,23 +429,12 @@ Fn.make_scalers = function()
                 local skill = types.Player.stats.skills[_skillid](self).base
                 local multiplier = Dt.pc.attack.damage/Cfg.Physical_Damage_to_XP * 80/(40 + skill)
                 xp = xp * multiplier
-                if Cfg.SUS_DEBUG then print('SUS [Melee] Skill Uses: '.. printify(multiplier)..' | Skill Progress: '..percentify(xp)..' | Damage Dealt: '.. printify(Dt.pc.attack.damage)) end
+                if Cfg.SUS_DEBUG then print('SUS [Weapon] Skill Uses: '.. printify(multiplier)..' | Skill Progress: '..percentify(xp)..' | Damage Dealt: '.. printify(Dt.pc.attack.damage)) end
                 return xp
             end
         }
     end
-    -- MARKSMAN Scaling
------------------------------------------------------------------------------------------------------------        Dt.scalers:new{ name = 'marksman', 
-    Dt.scalers:new{ name = 'marksman', 
-        func = function(_, xp)
 
-            local skill = types.Player.stats.skills.marksman(self).base
-            local multiplier = Dt.pc.attack.damage/Cfg.Physical_Damage_to_XP * 80/(40 + skill)
-            xp = xp * multiplier
-            if Cfg.SUS_DEBUG then print('SUS [Marksman] Skill Uses: '.. printify(multiplier)..' | Skill Progress: '..percentify(xp)..' | Damage Dealt: '.. printify(Dt.pc.attack.damage)) end
-            return xp
-        end
-    }
     -- HAND TO HAND Scaling
 -----------------------------------------------------------------------------------------------------------
     Dt.scalers:new{ name = 'handtohand', 
@@ -454,6 +443,7 @@ Fn.make_scalers = function()
             -- Now we average your fatigue damage and your health damage.
             -- It's the best method I could think of to balance the fact that H2H goes through 2 different healthbars at 2 different rates
             -- ..while also keeping compatibility with mods that change H2H GMSTs.
+            local skill = types.Player.stats.skills.handtohand(self).base
             local damage = Dt.pc.attack.damage
             local damage = (damage + damage * Dt.GMST.fHandtoHandHealthPer)/2
             local multiplier = damage/Cfg.Physical_Damage_to_XP * 80/(40 + skill)

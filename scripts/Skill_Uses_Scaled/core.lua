@@ -47,19 +47,6 @@ local onFrame = function(dt)
     end
 end
 
--- TEST
-
--- Add a text key handler that will react to all keys
-
-
-
-
-
---I.AnimationController.addTextKeyHandler('', function(groupname, key) Fn.get_weapon_draw(groupname, key) end)
-    
---END
-
-
 return {
     engineHandlers = {
         onActive = onActive,

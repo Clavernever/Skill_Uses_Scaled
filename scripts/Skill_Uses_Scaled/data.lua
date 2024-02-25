@@ -11,14 +11,6 @@ local function makecounter(val)
     end
 end
 
-local function makeKeyEnum(keys)
-local result = {}
-for _, key in ipairs(keys) do
-  result[key] = key
-end
-return result
-end
-
 local function setpreviousval(key, val)
     local oldval = val
     return function(self, newval)
@@ -26,8 +18,6 @@ local function setpreviousval(key, val)
         oldval = newval
     end
 end
-
-local function printify(num) return math.floor(num*100 + 0.5)/100 end
 
 local function get(var) -- var must be serializable, recursions WILL stack overflow :D
     if type(var)  ~= 'table' then return var
@@ -194,7 +184,7 @@ Dt.SKILLS = {
 }
 Dt.scaler_groups = {
     SPELL        = {'alteration', 'conjuration', 'destruction', 'illusion', 'mysticism', 'restoration'},
-    MELEE_WEAPON = {'axe', 'bluntweapon', 'longblade', 'shortblade', 'spear'}, -- !! Weapon health gets reduced by *net* damage dealt.
+    WEAPON       = {'axe', 'bluntweapon', 'longblade', 'shortblade', 'spear', 'marksman'},
     ARMOR        = {'heavyarmor', 'lightarmor', 'mediumarmor'}, -- !! Armor health gets reduced by the amount of incoming damage it *blocked*.
 }
 Dt.STANCE = {
