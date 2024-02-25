@@ -422,7 +422,7 @@ Fn.make_scalers = function()
 
     -- MELEE Scaling
 -----------------------------------------------------------------------------------------------------------
-    for _, _skillid in ipairs(Dt.scaler_groups.MELEE_WEAPON) do
+    for _, _skillid in ipairs(Dt.scaler_groups.WEAPON) do
         Dt.scalers:new{ name = _skillid, 
             func = function(_, xp)
 
