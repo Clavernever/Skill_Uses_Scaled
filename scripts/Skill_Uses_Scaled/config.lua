@@ -12,16 +12,6 @@ Cfg.MP_Refund_Armor_Mult  = 0.5 --> [This] number times your Armor Weight is add
 Cfg.MP_Refund_Max_Percent = 50  --> Refund will never go above [this] Percentage of spell cost. I strongly advice you never set [this] above [100].
                                 -- | Due to how offsets work, this also affects penalties from heavy armor.
 
-Cfg.Unarmored_Armor_Mult  = 0.5 -- [This] number times your Armor Weight is added to your Unarmored Skill when calculating XP.
-                                -- | Note that since skills level slower the higher they get, lighter armor / no armor will always result in better XP rates.
-Cfg.Unarmored_Start       = 3   -- Unarmored XP is multiplied by [This], and divided by [Recent Hits Taken]. Only enemy PHYSICAL attacks count for this formula, magic damage doesn't.
-                                -- |This results in Unarmored XP being frontloaded, which encourages it's use for mages and rogues that want a defensive skill but can't take enough hits to meaninfully progress an armor skill.
-Cfg.Unarmored_Min         = 0.1 -- The hit-based multiplier can't go below this number.
-Cfg.Unarmored_Decay_Timer = 30  -- [This] many seconds have to pass for a hit taken to stop reducing Unarmored XP gained from following hits.
-Cfg.Unarmored_Beast_Races = 6   -- Unarmored levels [this] times faster when you're an armor-clad Argonian or Khajiit. It's for your head and feetsies.
-                                -- | Only applies if you've got 3 or less empty slots (counting shield). Bonus is divided among those empty slots.
-                                -- | It's meant to make the heavy handicap from not being able to equip head and feet armor less bad, if you're running an armored character.
-                                -- | It's NOT meant to help, and will NOT affect, fully unarmored characters. Unarmored beast characters level the same as all others.
 
 Cfg.Armor_Damage_To_XP = 9 --> [This] much pre-mitigation physical damage is equivalent to one vanilla armor hit. Roughly.
 Cfg.Block_Damage_To_XP = 9 --> [This] much pre-mitigation physical damage is equivalent to one vanilla block hit. Roughly.
@@ -33,16 +23,28 @@ Cfg.HandToHand_Strength = 40 --> Hand to Hand xp per hit is multiplied by STR * 
                              -- The default is what OpenMW's "Factor strength into hand-to-hand combat" setting uses.
 Cfg.H2H_STR_Werewolves = false --> If this is true, Cfg.HandToHand_Strength will affect your xp as a werewolf.
 
-Cfg.Acrobatics_FP_Max = 3 -- With a full FP bar, your skill progress will be multiplied by [this].
-Cfg.Acrobatics_FP_Min = 0 -- With an empty FP bar, your skill progress will be multiplied by [this].
-                          -- | The multiplier goes down gradually, approaching FP_Min as your FP gets closer to empty.
+                                -- ALL OF THE FOLLOWING TIMERS ARE IN "REAL" SECONDS AND IGNORE WAIT/REST ACTIONS.
+Cfg.Unarmored_Armor_Mult  = 0.5 -- [This] number times your Armor Weight is added to your Unarmored Skill when calculating XP.
+                                -- | Note that since skills level slower the higher they get, lighter armor / no armor will always result in better XP rates.
+Cfg.Unarmored_Start       = 3   -- Unarmored XP is multiplied by [This], and divided by [Recent Hits Taken]. Only enemy PHYSICAL attacks count for this formula, magic damage doesn't.
+                                -- |This results in Unarmored XP being frontloaded, which encourages it's use for mages and rogues that want a defensive skill but can't take enough hits to meaninfully progress an armor skill.
+Cfg.Unarmored_Min         = 0.1 -- The hit-based multiplier can't go below this number.
+Cfg.Unarmored_Decay_Time = 30  -- [This] many seconds have to pass for a hit taken to stop reducing Unarmored XP gained from following hits.
+Cfg.Unarmored_Beast_Races = 6   -- Unarmored levels [this] times faster when you're an armor-clad Argonian or Khajiit. It's for your head and feetsies.
+                                -- | Only applies if you've got 3 or less empty slots (counting shield). Bonus is divided among those empty slots.
+                                -- | It's meant to make the heavy handicap from not being able to equip head and feet armor less bad, if you're running an armored character.
+                                -- | It's NOT meant to help, and will NOT affect, fully unarmored characters. Unarmored beast characters level the same as all others.
+Cfg.Acrobatics_Start      = 1.5 -- Acrobatics XP is multiplied by [This], and divided by [Recent Jumps]. The internal formula a lot more generous than the one used for Unarmored, as it's only meant to tone down spam jumping up hills.
+Cfg.Acrobatics_Decay_Time = 5   -- [This] many seconds have to pass for an Acrobatics skill use to have no effect on XP from further uses.
 Cfg.Acrobatics_Encumbrance_Max = 0.5 -- At full carry weight, your skill progress will be multiplied by [this].
 Cfg.Acrobatics_Encumbrance_Min = 1.5 -- At empty carry weight, your skill progress will be multiplied by [this].
                                      -- | Acrobatics is a Stealth skill, and this favours staying light an nimble.
 
-Cfg.Athletics_FP_Max = 3 -- With a full FP bar, your skill progress will be multiplied by [this].
-Cfg.Athletics_FP_Min = 0 -- With an empty FP bar, your skill progress will be multiplied by [this].
-                         -- | The multiplier goes down gradually, approaching FP_Min as your FP gets closer to empty.                                     -- | Acrobatics is a Stealth skill, and this favours staying light and agile.
+Cfg.Athletics_Start      = 0.5 -- Athletics XP is multiplied by [This] when you begin running after a long period of inactivity.
+Cfg.Athletics_Marathon   = 2   -- Athletics XP increases gradually as you run around, up to [This] times it's normal rate.
+Cfg.Athletics_Decay_Time = 300 -- You have to run for [This] many seconds to reach the Marathon multiplier, and stay idle the same amount of time for the it to be cleared back to Start.
+                               -- | In the multiplier goes up and down gradually, you won't lose your bonus for staying still a few seconds, now will you keep marathon rates by tapping forwards every couple seconds.
+Cfg.Athletics_No_Move_Penalty = 0.01-- When not ACTUALLY MOVING, your Athletics XP will be multiplied by this. You can still leave your character running into a wall and benefit, but you'll benefit roughly [This] times as much.
 Cfg.Athletics_Encumbrance_Max = 1.5 -- At full carry weight, your skill progress will be multiplied by [this].
 Cfg.Athletics_Encumbrance_Min = 0.5 -- At empty carry weight, your skill progress will be multiplied by [this].
                                     -- | Athletics is a Combat skill, and this favours carrying heavy gear into battle.

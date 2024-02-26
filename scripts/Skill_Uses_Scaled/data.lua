@@ -1,6 +1,8 @@
 local types = require('openmw.types')
 local time  = require('openmw_aux.time')
 local core  = require('openmw.core')
+local util  = require('openmw.util')
+
 
 -- TOOLS
 local function makecounter(val)
@@ -33,9 +35,11 @@ local Dt = {}
 Dt.pc = {
     spell           = 'spellid',
     armor_condition = {set_prevframe = setpreviousval('prevframe', {}) },
-    attack          = {speed = 0, damage = 0, step = 0, begin = 0, release = 0}, -- weapon = _obj
+    attack          = {speed = 0, damage = 0, step = 0, minkey = '', group = '', draw = 0, begin = 0, release = 0}, -- weapon = _obj
     probepick       = nil, -- _obj
     security_target = nil, -- _obj
+    grounded        = nil,
+    position        = util.vector3(0,0,0),
 }
 -- Engine Data
 Dt.ATTACK_ANIMATION_GROUPS = {
@@ -53,10 +57,10 @@ Dt.ATTACK_ANIMATION_GROUPS = {
 }
 Dt.ATTACK_ANIMATION_KEYS = {
     MIN = {
-        ['chop min attack'  ] = true,
-        ['slash min attack' ] = true,
-        ['thrust min attack'] = true,
-        ['shoot min attack' ] = true,
+        ['chop min attack'  ] = 'chop',
+        ['slash min attack' ] = 'slash',
+        ['thrust min attack'] = 'thrust',
+        ['shoot min attack' ] = 'shoot',
     },
     MAX = {
         ['chop max attack'  ] = true,
@@ -128,19 +132,6 @@ Dt.ARMOR_TYPES = {
     [types.Armor.TYPE.RPauldron] = core.getGMST('iPauldronWeight'),
     [types.Armor.TYPE.Shield   ] = core.getGMST('iShieldWeight'  ),
 }
-Dt.ARMOR_TYPE_NAMES = { -- unused at the moment
-    [types.Armor.TYPE.Boots    ] = 'Boots',
-    [types.Armor.TYPE.Cuirass  ] = 'Cuirass',
-    [types.Armor.TYPE.Greaves  ] = 'Greaves',
-    [types.Armor.TYPE.Helmet   ] = 'Helmet',
-    [types.Armor.TYPE.LGauntlet] = 'LGauntlet',
-    [types.Armor.TYPE.LPauldron] = 'LPauldron',
-    [types.Armor.TYPE.LBracer  ] = 'LBracer',
-    [types.Armor.TYPE.RBracer  ] = 'RBracer',
-    [types.Armor.TYPE.RGauntlet] = 'RGauntlet',
-    [types.Armor.TYPE.RPauldron] = 'RPauldron',
-    [types.Armor.TYPE.Shield   ] = 'Shield',
-}
 Dt.ARMOR_RATING_WEIGHTS= {
     [types.Armor.TYPE.Cuirass  ] = 0.3 ,
     [types.Armor.TYPE.Shield   ] = 0.1 ,
@@ -197,8 +188,7 @@ Dt.scalers = {
     new = function(self, t) end-- t = {name = skillid, func = function(xp) dosomething return xp end}
 }
 -- SCRIPT LOGIC VARIABLES
-Dt.recent_activations = {}
-Dt.counters = {unarmored = makecounter(0), athletics = makecounter(0), acrobatics = makecounter(0), frame = makecounter(0), security = makecounter(0), weapon = makecounter(0)}
+Dt.counters = {unarmored = makecounter(0), athletics = makecounter(0), acrobatics = makecounter(0),athletics_debug = makecounter(0),  frame = makecounter(0), security = makecounter(0), weapon = makecounter(0)}
 Dt.securiting = false
 
 --[] Scaler creator: Scalers are simple functions that become the body of skp.addSkillUsedHandler(func) through a Dt.scalers[skillid]() call.

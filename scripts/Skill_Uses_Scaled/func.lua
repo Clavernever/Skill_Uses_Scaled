@@ -3,6 +3,7 @@ local self   = require('openmw.self')
 local types  = require('openmw.types')
 local async  = require('openmw.async')
 local time   = require('openmw_aux.time')
+local ui     = require('openmw.ui')
 local i_UI   = require('openmw.interfaces').UI
 local input  = require('openmw.input')
 local camera = require('openmw.camera')
@@ -16,11 +17,11 @@ local Cfg = require('scripts.Skill_Uses_Scaled.config')
 
 -- TOOLS
 local eps = 0.001
-function equal(a,b)          return (math.abs(b - a) < eps)                                  end
+function equal(a,b) return (math.abs(b - a) < eps) end
 
 local function percentify(num) return string.format('%.1f', num*100)..'%' end
 
-local function get_val(not_table_or_func)   return not_table_or_func                                        end
+local function get_val(not_table_or_func)   return not_table_or_func end
 
 local function get(var) -- var must be serializable, recursions WILL stack overflow :D
     if type(var)  ~= 'table' then return var
@@ -126,40 +127,52 @@ Fn.get_weapon_damage = function(weapon, draw, atktype)
     return damage
 end
 
+local function get_attack_draw()
+    if not (Dt.pc.attack.step == 1) then return Dt.pc.attack.draw end
+    local atktype = Dt.ATTACK_ANIMATION_KEYS.MIN[Dt.pc.attack.minkey]
+    local group   = Dt.pc.attack.group
+    local min     = anim.getTextKeyTime(self, group..': '..atktype..' min attack')
+    local current = anim.getCurrentTime(self, group)
+    local max     = anim.getTextKeyTime(self, group..': '..atktype..' max attack')
+    if current < min then print('SUS: Can\'t get weapon draw if current < min') return end
+    Dt.pc.attack.step = 2 -- Make sure we don't check again till the next hit is reached.
+    local draw = 0
+    if current < max then -- Getting draw mid-windup. Calculate how far we've gotten.
+        local max = math.max(0, max - min)
+        local current = math.max(0, current - min)
+        draw = math.min(current/max, 1)
+    end -- If we skipped this block, then we've not drawn our weapon at all, and draw = 0
+    return draw
+end
 function Fn.get_attack(groupname, key)
     if Dt.pc.attack.step == 0 then
         if Dt.ATTACK_ANIMATION_KEYS.MIN[key] then
-            Dt.pc.attack.begin = anim.getCompletion(self, groupname)
-            Dt.pc.attack.step = 1
+            Dt.pc.attack.step   = 1
+            Dt.pc.attack.minkey = key
+            Dt.pc.attack.group  = groupname
         end
     elseif Dt.pc.attack.step == 1 or Dt.pc.attack.step == 2 then
         if Dt.pc.attack.step == 1 and Dt.ATTACK_ANIMATION_KEYS.MAX[key]then
-            Dt.pc.attack.release = anim.getCompletion(self, groupname)
+            Dt.pc.attack.draw = 1 -- No need to calculate. We reached max. It's a full draw.
             Dt.pc.attack.step = 2
         elseif Dt.ATTACK_ANIMATION_KEYS.HIT_RELEASE[key] then
-            -- Get Draw
-            local begin = Dt.pc.attack.begin
-            local release = Dt.pc.attack.release
-            if Dt.pc.attack.step == 1 then release = begin end
-            local draw = 1
-            if begin ~= 1 then draw = (math.max(0, release - begin))/(1 - begin) end
+            Dt.pc.attack.draw = get_attack_draw()
+            Dt.pc.attack.step = 0
             -- Get attack min and max damages
             local weapon = types.Actor.getEquipment(self, Dt.SLOTS.WEAPON)
             if weapon then
-                Dt.pc.attack.damage = math.max(1, Fn.get_weapon_damage(weapon, draw, Dt.ATTACK_ANIMATION_KEYS.HIT_RELEASE[key]))
+                Dt.pc.attack.damage = math.max(1, Fn.get_weapon_damage(weapon, Dt.pc.attack.draw, Dt.ATTACK_ANIMATION_KEYS.HIT_RELEASE[key]))
             else
-                Dt.pc.attack.damage = math.max(1, Fn.get_H2H_damage(draw))
+                Dt.pc.attack.damage = math.max(1, Fn.get_H2H_damage(Dt.pc.attack.draw))
             end
-            Dt.pc.attack.step = 0
---             print(groupname..' | Damage: '..string.format('%.2f', Dt.pc.attack.damage)..' | Draw: '..percentify(draw)..' | Key:'..key)
+            print(groupname..' | Damage: '..string.format('%.2f', Dt.pc.attack.damage)..' | Draw: '..percentify(Dt.pc.attack.draw)..' | Key:'..key)
         end
     end
 end
 
 Fn.set_hit_release = function()
     if Dt.pc.attack.step == 1 then
-        local groupname = anim.getActiveGroup(self, 2)
-        Dt.pc.attack.release = anim.getCompletion(self, groupname)
+        Dt.pc.attack.draw = get_attack_draw()
         Dt.pc.attack.step = 2
     end
 end
@@ -185,15 +198,13 @@ Fn.register_Use_Action_Handler = function()
                     end
                 end
             else
-                if Dt.STANCE.WEAPON[types.Actor.getStance(self)] then
-                    local weapon = types.Actor.getEquipment(self, Dt.SLOTS.WEAPON)
-                    if not weapon or (weapon.type == types.Weapon) then -- H2H
-                        if i_UI.getMode() then async:newSimulationTimer(0, Fn.set_hit_release_callback, nil)
-                        else Fn.set_hit_release() end
-                    elseif (weapon.type == types.Lockpick) or (weapon.type == types.Probe) then -- Security
-                        Dt.securiting = false
-                        Dt.pc.security_target = nil -- This will turn the scaler off in case another mod triggers security uses outside of this loop.
-                    end
+                if not Dt.STANCE.WEAPON[types.Actor.getStance(self)] then return end
+                local weapon = types.Actor.getEquipment(self, Dt.SLOTS.WEAPON)
+                if not weapon or (weapon.type == types.Weapon) then -- H2H
+                    if not i_UI.getMode() then Fn.set_hit_release() end
+                elseif (weapon.type == types.Lockpick) or (weapon.type == types.Probe) then -- Security
+                    Dt.securiting = false
+                    Dt.pc.security_target = nil -- This will turn the scaler off in case another mod triggers security uses outside of this loop.
                 end
             end
         end
@@ -272,11 +283,27 @@ Fn.get_AR = function()
     return rating
 end
 
-local stopFn = time.runRepeatedly(function()
-        if Dt.counters.unarmored(0) > Cfg.Unarmored_Min then
-            Dt.counters.unarmored(- Dt.counters.unarmored(0)/Cfg.Unarmored_Decay_Timer - 1/(Cfg.Unarmored_Decay_Timer))
+local unarmored_hit_decay = time.runRepeatedly(function()
+        if Dt.counters.unarmored(0) > 0.01 then
+            Dt.counters.unarmored(- math.max(Dt.counters.unarmored(0)/Cfg.Unarmored_Decay_Time, 2/(Cfg.Unarmored_Decay_Time)))
+        else Dt.counters.unarmored(-Dt.counters.unarmored(0))
         end
     end, time.second)
+local acrobatics_jump_decay = time.runRepeatedly(function()
+        if Dt.counters.acrobatics(0) > 0.01 then
+            Dt.counters.acrobatics(- math.max(Dt.counters.acrobatics(0)/Cfg.Acrobatics_Decay_Time, 2/(Cfg.Acrobatics_Decay_Time)))
+        else Dt.counters.acrobatics(-Dt.counters.acrobatics(0))
+        end
+    end, time.second)
+local athletics_run_decay  = time.runRepeatedly(function()
+        if Dt.counters.athletics(0) > 0.01 then
+            Dt.counters.athletics(- math.max(Dt.counters.athletics(0) - Cfg.Athletics_Decay_Time, 1))
+        else Dt.counters.athletics(-Dt.counters.athletics(0))
+        end
+        if Dt.counters.athletics_debug(0) > 9.01 then
+            if Cfg.SUS_DEBUG then print('SUS [Athletics] Decay Timer: '.. string.format('%.0f', Dt.counters.athletics(0))) end
+        end
+        end, time.second)
 
 Fn.make_scalers = function()
 
@@ -307,10 +334,10 @@ Fn.make_scalers = function()
                 local multiplier = damage/Cfg.Armor_Damage_To_XP * 2*Dt.GMST.iBaseArmorSkill / (Dt.GMST.iBaseArmorSkill + skill)
                 xp = xp * multiplier
 
-                if Cfg.SUS_DEBUG then print('SUS [Armor] Skill Uses: '.. string.format('%.2f', multiplier)..' | Skill Progress: '..percentify(xp)..' | Damage Received: '.. string.format('%.2f', damage)) end
 
                 -- Add a hit for Unarmored's timer, so that having a couple empty pieces doesn't result in massive unarmored bonuses.
                 Dt.counters.unarmored(1)
+                if Cfg.SUS_DEBUG then print('SUS [Armor] Skill Uses: '.. string.format('%.2f', multiplier)..' | Skill Progress: '..percentify(xp)..' | Damage Received: '.. string.format('%.2f', damage)) end
 
                 return xp
             end
@@ -387,8 +414,8 @@ Fn.make_scalers = function()
                     if Cfg.SUS_DEBUG then print('SUS - Held Spell not found, returning vanilla XP') end
                     return xp
                 end
-                local mp_factor = 0.01*Fn.get_active_effect_mag('fortifymagicka') + 0.1*Fn.get_active_effect_mag('fortifymaximummagicka')
-                local multiplier = spell.cost/Cfg.Magicka_to_XP * 4.8/(4 + mp_factor)
+                local mp_factor = 0.01*types.Player.stats.dynamic.magicka(self).base
+                local multiplier = spell.cost/Cfg.Magicka_to_XP * 4.8/(4 + math.max(0, mp_factor - 1))
                 xp = xp * multiplier
 
                 if Cfg.SUS_DEBUG then print('SUS [Magic] Skill Uses: '.. string.format('%.2f', multiplier)..' | Skill Progress: '..percentify(xp)..' | Spell Cost: '.. string.format('%.2f', spell.cost)) end
@@ -453,12 +480,10 @@ Fn.make_scalers = function()
         func = function(_, xp)
             if not Cfg.enabled['acrobatics'] then return xp end
 
-            local fatigued_mult   = Cfg.Acrobatics_FP_Min + (Cfg.Acrobatics_FP_Max - Cfg.Acrobatics_FP_Min)
-                                    * types.Actor.stats.dynamic.fatigue(self).current / types.Actor.stats.dynamic.fatigue(self).base
             local encumbered_mult = Cfg.Acrobatics_Encumbrance_Min + (Cfg.Acrobatics_Encumbrance_Max - Cfg.Acrobatics_Encumbrance_Min)
                                     * types.Actor.getEncumbrance(self) / (Dt.GMST.fEncumbranceStrMult * types.Player.stats.attributes.strength(self).base)
-
-            local multiplier = fatigued_mult * encumbered_mult -- No fatigue% => no XP, and more weight% == less XP
+            local recursive_mult  = (Cfg.Acrobatics_Start) / (1 + (Dt.counters.acrobatics(1) -1)/5)
+            local multiplier = encumbered_mult * recursive_mult -- No fatigue% => no XP, and more weight% == less XP
             xp = xp * multiplier
             if Cfg.SUS_DEBUG then print('SUS [Acrobatics] Skill Uses: '.. string.format('%.2f', multiplier)..' | Skill Progress: '..percentify(xp)..' | FP: '.. percentify(types.Actor.stats.dynamic.fatigue(self).current / types.Actor.stats.dynamic.fatigue(self).base)) end
             return xp
@@ -468,19 +493,16 @@ Fn.make_scalers = function()
         func = function(_, xp)
             if not Cfg.enabled['athletics'] then return xp end
 
-            local fatigued_mult   = Cfg.Athletics_FP_Min + (Cfg.Athletics_FP_Max - Cfg.Athletics_FP_Min)
-                                    * types.Actor.stats.dynamic.fatigue(self).current / types.Actor.stats.dynamic.fatigue(self).base
             local encumbered_mult = Cfg.Athletics_Encumbrance_Min + (Cfg.Athletics_Encumbrance_Max - Cfg.Athletics_Encumbrance_Min)
                                     * types.Actor.getEncumbrance(self) / (Dt.GMST.fEncumbranceStrMult * types.Player.stats.attributes.strength(self).base)
+            local recursive_mult  = (Cfg.Athletics_Start) + (Cfg.Athletics_Marathon - (Cfg.Athletics_Start)) * (Dt.counters.athletics(2) -2)/Cfg.Athletics_Decay_Time
 
-            local multiplier = fatigued_mult * encumbered_mult -- No fatigue% => no XP, and more weight% == more XP
+            local multiplier = encumbered_mult * recursive_mult-- No fatigue% => no XP, and more weight% == more XP
             xp = xp * multiplier
-            local printcounter = Dt.counters.athletics(1)
-            if Cfg.SUS_DEBUG then 
-                if printcounter > 9.01 then
-                    print('SUS [Athletics] Skill Uses: '.. string.format('%.2f', multiplier)..' | Skill Progress: '..percentify(xp * printcounter)..' | FP: '.. percentify(types.Actor.stats.dynamic.fatigue(self).current / types.Actor.stats.dynamic.fatigue(self).base))
-                    Dt.counters.athletics(-printcounter)
-                end
+            local printcounter = Dt.counters.athletics_debug(1)
+            if printcounter > 9.01 then
+                if Cfg.SUS_DEBUG then print('SUS [Athletics] Skill Uses: '.. string.format('%.2f', multiplier)..' | Skill Progress: '..percentify(xp * printcounter)..' | Marathon Mult: '.. string.format('%.2f', recursive_mult)) end
+                Dt.counters.athletics_debug(-printcounter)
             end
             return xp
         end

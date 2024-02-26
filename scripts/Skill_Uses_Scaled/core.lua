@@ -10,9 +10,13 @@ local Fn = require('scripts.Skill_Uses_Scaled.func')
 local Cfg = require('scripts.Skill_Uses_Scaled.config')
 local Mui = require('scripts.Skill_Uses_Scaled.modui')
 
+function get_keytime(key) return anim.getTextKeyTime(self, key) - (anim.getTextKeyTime(self, 'chop min attack'))/(anim.getTextKeyTime(self, 'chop max attack') - anim.getTextKeyTime(self, 'chop min attack')) end
+
 for _, _groupname in ipairs(Dt.ATTACK_ANIMATION_GROUPS) do
+--     i_AnimControl.addTextKeyHandler(_groupname, function(groupname, key) print('Completion: '..string.format('%.2f', anim.getTextKeyTime(self, 'hit'))..' | Key: '..key) end)
     i_AnimControl.addTextKeyHandler(_groupname, function(groupname, key) Fn.get_attack(groupname, key) end)
 end
+
 
 Fn.register_Use_Action_Handler()
 
@@ -56,7 +60,16 @@ return {
         onInit   = onInit  ,
     },
     eventHandlers = {
-        SUS_updateGLOBvar = function(t) Dt.GLOB[t.id] = t.val end
+        SUS_updateGLOBvar = function(t) Dt.GLOB[t.id] = t.val end,
+        UiModeChanged = function(data)
+            if not data.newMode then return end
+            if data.oldMode     then return end
+            if not Dt.STANCE.WEAPON[types.Actor.getStance(self)] then return end
+            local weapon = types.Actor.getEquipment(self, Dt.SLOTS.WEAPON)
+            if not weapon or (weapon.type == types.Weapon) then
+                 Fn.set_hit_release()
+            end
+        end,
     }
 }
 
