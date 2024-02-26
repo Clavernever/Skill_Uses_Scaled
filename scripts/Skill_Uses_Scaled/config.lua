@@ -12,7 +12,6 @@ Cfg.MP_Refund_Armor_Mult  = 0.5 --> [This] number times your Armor Weight is add
 Cfg.MP_Refund_Max_Percent = 50  --> Refund will never go above [this] Percentage of spell cost. I strongly advice you never set [this] above [100].
                                 -- | Due to how offsets work, this also affects penalties from heavy armor.
 
-
 Cfg.Armor_Damage_To_XP = 9 --> [This] much pre-mitigation physical damage is equivalent to one vanilla armor hit. Roughly.
 Cfg.Block_Damage_To_XP = 9 --> [This] much pre-mitigation physical damage is equivalent to one vanilla block hit. Roughly.
 

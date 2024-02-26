@@ -35,7 +35,7 @@ local Dt = {}
 Dt.pc = {
     spell           = 'spellid',
     armor_condition = {set_prevframe = setpreviousval('prevframe', {}) },
-    attack          = {speed = 0, damage = 0, step = 0, minkey = '', group = '', draw = 0, begin = 0, release = 0}, -- weapon = _obj
+    attack          = {speed = 0, damage = 0, step = 0, minkey = '', group = '', draw = 0}, -- weapon = _obj
     probepick       = nil, -- _obj
     security_target = nil, -- _obj
     grounded        = nil,
