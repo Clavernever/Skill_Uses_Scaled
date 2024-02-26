@@ -1,10 +1,8 @@
 local core  = require('openmw.core')
 local world = require('openmw.world')
+local storage = require('openmw.storage')
 
-local Dt = require('scripts.Skill_Uses_Scaled.data')
-
--- All we do here is:
--- Get global variables (GLOB) so core.lua can update the corresponding Dt values with them.
+local globalSettings = storage.globalSection('SettingsGlobalMyMod')
 
 return {
     eventHandlers = {

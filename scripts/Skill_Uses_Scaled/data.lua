@@ -198,7 +198,7 @@ Dt.scalers = {
 }
 -- SCRIPT LOGIC VARIABLES
 Dt.recent_activations = {}
-Dt.counters = {athletics = makecounter(0), acrobatics = makecounter(0), frame = makecounter(0), security = makecounter(0), weapon = makecounter(0)}
+Dt.counters = {unarmored = makecounter(0), athletics = makecounter(0), acrobatics = makecounter(0), frame = makecounter(0), security = makecounter(0), weapon = makecounter(0)}
 Dt.securiting = false
 
 --[] Scaler creator: Scalers are simple functions that become the body of skp.addSkillUsedHandler(func) through a Dt.scalers[skillid]() call.

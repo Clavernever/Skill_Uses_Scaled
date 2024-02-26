@@ -8,6 +8,7 @@ local i_AnimControl = require('openmw.interfaces').AnimationController
 local Dt = require('scripts.Skill_Uses_Scaled.data')
 local Fn = require('scripts.Skill_Uses_Scaled.func')
 local Cfg = require('scripts.Skill_Uses_Scaled.config')
+local Mui = require('scripts.Skill_Uses_Scaled.modui')
 
 for _, _groupname in ipairs(Dt.ATTACK_ANIMATION_GROUPS) do
     i_AnimControl.addTextKeyHandler(_groupname, function(groupname, key) Fn.get_attack(groupname, key) end)
@@ -52,6 +53,7 @@ return {
         onActive = onActive,
         onUpdate = onUpdate,
         onFrame  = onFrame ,
+        onInit   = onInit  ,
     },
     eventHandlers = {
         SUS_updateGLOBvar = function(t) Dt.GLOB[t.id] = t.val end
