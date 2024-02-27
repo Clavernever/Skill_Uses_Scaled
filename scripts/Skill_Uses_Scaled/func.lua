@@ -165,7 +165,6 @@ function Fn.get_attack(groupname, key)
             else
                 Dt.pc.attack.damage = math.max(1, Fn.get_H2H_damage(Dt.pc.attack.draw))
             end
-            print(groupname..' | Damage: '..string.format('%.2f', Dt.pc.attack.damage)..' | Draw: '..percentify(Dt.pc.attack.draw)..' | Key:'..key)
         end
     end
 end
@@ -303,11 +302,11 @@ local athletics_run_decay  = time.runRepeatedly(function()
         if Dt.counters.athletics_debug(0) > 9.01 then
             if Cfg.SUS_DEBUG then print('SUS [Athletics] Decay Timer: '.. string.format('%.0f', Dt.counters.athletics(0))) end
         end
-        end, time.second)
+    end, time.second)
 
 Fn.make_scalers = function()
 
-    -- ARMOR Scaling
+    -- ARMOR
 -----------------------------------------------------------------------------------------------------------
     for _, _skillid in ipairs(Dt.scaler_groups.ARMOR) do
         Dt.scalers:new{
@@ -334,7 +333,6 @@ Fn.make_scalers = function()
                 local multiplier = damage/Cfg.Armor_Damage_To_XP * 2*Dt.GMST.iBaseArmorSkill / (Dt.GMST.iBaseArmorSkill + skill)
                 xp = xp * multiplier
 
-
                 -- Add a hit for Unarmored's timer, so that having a couple empty pieces doesn't result in massive unarmored bonuses.
                 Dt.counters.unarmored(1)
                 if Cfg.SUS_DEBUG then print('SUS [Armor] Skill Uses: '.. string.format('%.2f', multiplier)..' | Skill Progress: '..percentify(xp)..' | Damage Received: '.. string.format('%.2f', damage)) end
@@ -344,7 +342,7 @@ Fn.make_scalers = function()
         }
     end
 
-    -- BLOCK Scaling
+    -- BLOCK
 -----------------------------------------------------------------------------------------------------------
     Dt.scalers:new{ name = 'block',
         func = function(_, xp)
@@ -376,7 +374,7 @@ Fn.make_scalers = function()
         end
     }
 
-    -- UNARMORED Scaling
+    -- UNARMORED
 -----------------------------------------------------------------------------------------------------------
     Dt.scalers:new{ name = 'unarmored', 
         func = function(_, xp)
@@ -385,9 +383,9 @@ Fn.make_scalers = function()
             local armor_weight = 0
             local armor = Fn.get_equipped_armor()
             for _, _obj in ipairs(armor) do armor_weight = armor_weight + types.Armor.record(_obj).weight end
-            local race         = get_val(types.Player.record(self).race)
+--             local race         = get_val(types.Player.record(self).race)
             local beast_factor = 1 -- If you have more than 3 empty slots, this will stay a 1 and not affect your XP rates, even if you are Argonian/Khajiit
-            if #Fn.get_unarmored_slots() <= 3 and (race == 'argonian' or race == 'khajiit') then beast_factor = Cfg.Unarmored_Beast_Races / #Fn.get_unarmored_slots() end
+--             if #Fn.get_unarmored_slots() <= 3 and (race == 'argonian' or race == 'khajiit') then beast_factor = Cfg.Unarmored_Beast_Races / #Fn.get_unarmored_slots() end
             local gank_factor  = (Cfg.Unarmored_Start - Cfg.Unarmored_Min) / (2 * Dt.counters.unarmored(1) - 1) + Cfg.Unarmored_Min
             local skill        = types.Player.stats.skills['unarmored'](self).base
             local rating       = skill * Dt.GMST.fUnarmoredBase1 * skill * Dt.GMST.fUnarmoredBase2
@@ -402,7 +400,7 @@ Fn.make_scalers = function()
         end
     }
 
-        -- SPELL Scaling
+        -- SPELL
 -----------------------------------------------------------------------------------------------------------
     for _, _skillid in ipairs(Dt.scaler_groups.SPELL) do
         Dt.scalers:new{ name = _skillid, 
@@ -414,19 +412,20 @@ Fn.make_scalers = function()
                     if Cfg.SUS_DEBUG then print('SUS - Held Spell not found, returning vanilla XP') end
                     return xp
                 end
-                local mp_factor = 0.01*types.Player.stats.dynamic.magicka(self).base
+                local max_mp     = Player.stats.dynamic.magicka(self).base
+                local mp_factor  = 0.01*types.max_mp
                 local multiplier = spell.cost/Cfg.Magicka_to_XP * 4.8/(4 + math.max(0, mp_factor - 1))
                 xp = xp * multiplier
 
                 if Cfg.SUS_DEBUG then print('SUS [Magic] Skill Uses: '.. string.format('%.2f', multiplier)..' | Skill Progress: '..percentify(xp)..' | Spell Cost: '.. string.format('%.2f', spell.cost)) end
 
-                if Cfg.enabled['refund'] then
+                if Cfg.enabled['toggle_refund'] then
                     local armor_weight = 0
-                    local armor = Fn.get_equipped_armor()
+                    local armor        = Fn.get_equipped_armor()
                     for _, _obj in ipairs(armor) do armor_weight = armor_weight + types.Armor.record(_obj).weight end
                     local armor_offset = armor_weight * Cfg.MP_Refund_Armor_Mult
-                    local cost_factor = Cfg.Magicka_to_XP / (Cfg.Magicka_to_XP + spell.cost/Cfg.Magicka_to_XP)
-                    local skill = types.Player.stats.skills[_skillid](self).base
+                    local cost_factor  = max_mp / (max_mp + spell.cost)
+                    local skill        = types.Player.stats.skills[_skillid](self).base
                     local skill_factor = (skill - Cfg.MP_Refund_Skill_Offset - armor_offset) / (40 + skill)
 
                     local refund = spell.cost * cost_factor * skill_factor * 0.01*Cfg.MP_Refund_Max_Percent
@@ -434,7 +433,11 @@ Fn.make_scalers = function()
                     --Yes, this will apply even if current > max.
                     --To keep vanilla compatibility, we have to consider current>max as a valid gameplay state, since Fortify Magicka doesn't increase Max MP.
                     types.Player.stats.dynamic.magicka(self).current = types.Player.stats.dynamic.magicka(self).current + refund
-                    if Cfg.SUS_DEBUG then print('SUS - Refund: '.. string.format('%.2f', refund*10)..'% | '.. string.format('%.2f', refund) ..' MP') end
+                    if refund > 0 then
+                        if Cfg.SUS_DEBUG then print('SUS [Dynamic Spell Cost] Refund: '.. string.format('%.2f', refund/spell.cost*100)..'% | '.. string.format('%.2f', refund) ..' MP') end
+                    else
+                        if Cfg.SUS_DEBUG then print('SUS [Dynamic Spell Cost] Penalty: '.. string.format('%.2f', refund/spell.cost*100)..'% | '.. string.format('%.2f', refund) ..' MP') end
+                    end
                 end
 
                 return xp
@@ -442,7 +445,7 @@ Fn.make_scalers = function()
         }
     end
 
-    -- MELEE Scaling
+    -- MELEE
 -----------------------------------------------------------------------------------------------------------
     for _, _skillid in ipairs(Dt.scaler_groups.WEAPON) do
         Dt.scalers:new{ name = _skillid, 
@@ -452,13 +455,13 @@ Fn.make_scalers = function()
                 local skill = types.Player.stats.skills[_skillid](self).base
                 local multiplier = Dt.pc.attack.damage/Cfg.Physical_Damage_to_XP * 80/(40 + skill)
                 xp = xp * multiplier
-                if Cfg.SUS_DEBUG then print('SUS [Weapon] Skill Uses: '.. string.format('%.2f', multiplier)..' | Skill Progress: '..percentify(xp)..' | Damage Dealt: '.. string.format('%.2f', Dt.pc.attack.damage)) end
+                if Cfg.SUS_DEBUG then print('SUS [Weapon] Skill Uses: '.. string.format('%.2f', multiplier)..' | Skill Progress: '..percentify(xp)..' | Damage Dealt: '.. string.format('%.2f', Dt.pc.attack.damage)..' | Weapon Draw // Attack Charge: '..percentify(Dt.pc.attack.draw)) end
                 return xp
             end
         }
     end
 
-    -- HAND TO HAND Scaling
+    -- HAND TO HAND
 -----------------------------------------------------------------------------------------------------------
     Dt.scalers:new{ name = 'handtohand', 
         func = function(_, xp)
@@ -472,10 +475,12 @@ Fn.make_scalers = function()
             local damage = (damage + damage * Dt.GMST.fHandtoHandHealthPer)/2
             local multiplier = damage/Cfg.Physical_Damage_to_XP * 80/(40 + skill)
             xp = xp * multiplier
-            if Cfg.SUS_DEBUG then print('SUS [Hand-To-Hand] Skill Uses: '.. string.format('%.2f', multiplier)..' | Skill Progress: '..percentify(xp)..' | Damage Dealt: '.. string.format('%.2f', damage)) end
+            if Cfg.SUS_DEBUG then print('SUS [Hand-To-Hand] Skill Uses: '.. string.format('%.2f', multiplier)..' | Skill Progress: '..percentify(xp)..' | Damage Dealt: '.. string.format('%.2f', damage)..' | Weapon Draw // Attack Charge: '..percentify(Dt.pc.attack.draw)) end
             return xp
         end
     }
+    -- ACROBATICS
+-----------------------------------------------------------------------------------------------------------
     Dt.scalers:new{ name = 'acrobatics', 
         func = function(_, xp)
             if not Cfg.enabled['acrobatics'] then return xp end
@@ -485,28 +490,43 @@ Fn.make_scalers = function()
             local recursive_mult  = (Cfg.Acrobatics_Start) / (1 + (Dt.counters.acrobatics(1) -1)/5)
             local multiplier = encumbered_mult * recursive_mult -- No fatigue% => no XP, and more weight% == less XP
             xp = xp * multiplier
-            if Cfg.SUS_DEBUG then print('SUS [Acrobatics] Skill Uses: '.. string.format('%.2f', multiplier)..' | Skill Progress: '..percentify(xp)..' | FP: '.. percentify(types.Actor.stats.dynamic.fatigue(self).current / types.Actor.stats.dynamic.fatigue(self).base)) end
+            if Cfg.SUS_DEBUG then print('SUS [Acrobatics] Skill Uses: '.. string.format('%.2f', multiplier)..' | Skill Progress: '..percentify(xp)..' | Jump Spam Mult: '.. string.format('%.2f', recursive_mult)) end
+            Dt.pc.grounded = false -- We skip the next athletics use, bunny hopping isn't running.
             return xp
         end
     }
+    -- ATHLETICS
+-----------------------------------------------------------------------------------------------------------
     Dt.scalers:new{ name = 'athletics', 
-        func = function(_, xp)
+        func = function(useType, xp)
             if not Cfg.enabled['athletics'] then return xp end
-
+            if not Dt.pc.grounded then Dt.pc.grounded = true return 0 end -- We just jumped, setup for next cycle and give no xp.
+            local position = self.object.position
+            Dt.pc.grounded = nearby.castRay(position, position - util.vector3(0,0,25),{collisionType = nearby.COLLISION_TYPE.AnyPhysical}).hitPos
+            local swimming = position.z < -100
+            if not swimming and not Dt.pc.grounded then Dt.pc.grounded = true return 0 end -- We were in the air or in a particularly slopey slope. Setup. Skip.
+            local movement = Dt.pc.position - position
+            movement = math.abs(movement.x) + math.abs(movement.y)
+            local move_factor = 1
+            if movement < 150 then move_factor = Cfg.Athletics_No_Move_Penalty end
+            Dt.pc.position = position
             local encumbered_mult = Cfg.Athletics_Encumbrance_Min + (Cfg.Athletics_Encumbrance_Max - Cfg.Athletics_Encumbrance_Min)
                                     * types.Actor.getEncumbrance(self) / (Dt.GMST.fEncumbranceStrMult * types.Player.stats.attributes.strength(self).base)
             local recursive_mult  = (Cfg.Athletics_Start) + (Cfg.Athletics_Marathon - (Cfg.Athletics_Start)) * (Dt.counters.athletics(2) -2)/Cfg.Athletics_Decay_Time
-
-            local multiplier = encumbered_mult * recursive_mult-- No fatigue% => no XP, and more weight% == more XP
+            if swimming then Dt.counters.athletics(2) end
+            local multiplier = encumbered_mult * recursive_mult * move_factor
             xp = xp * multiplier
             local printcounter = Dt.counters.athletics_debug(1)
-            if printcounter > 9.01 then
+            if printcounter > 5.01 then
                 if Cfg.SUS_DEBUG then print('SUS [Athletics] Skill Uses: '.. string.format('%.2f', multiplier)..' | Skill Progress: '..percentify(xp * printcounter)..' | Marathon Mult: '.. string.format('%.2f', recursive_mult)) end
                 Dt.counters.athletics_debug(-printcounter)
             end
             return xp
         end
     }
+
+    -- SECURITy
+-----------------------------------------------------------------------------------------------------------
     Dt.scalers:new{ name = 'security', 
         func = function(useType, xp)
             if not Cfg.enabled['security'] then return xp end
