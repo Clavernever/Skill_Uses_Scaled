@@ -70,7 +70,7 @@ Cfg.group_toggles = {
     toggle_physical   = {'axe', 'bluntweapon', 'longblade', 'shortblade', 'spear', 'marksman', 'handtohand'}, --1~7
     toggle_magic      = {'alteration', 'conjuration', 'destruction', 'illusion', 'mysticism', 'restoration'}, --8~13
     toggle_armor      = {'heavyarmor', 'lightarmor', 'mediumarmor', 'block'}, --14~17
-    toggle_other      = {'athletics', 'acrobatics', 'security', 'armorer', 'enchant', 'alchemy', 'sneak', 'speechcraft', 'mercantile'}, --18~27
+    toggle_other      = {'armorer', 'enchant', 'alchemy', 'sneak', 'speechcraft', 'mercantile'}, --18~27
 }
 Cfg.custom = {
     toggle_refund = true,
