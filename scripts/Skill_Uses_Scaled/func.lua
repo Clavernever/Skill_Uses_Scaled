@@ -412,8 +412,8 @@ Fn.make_scalers = function()
                     if Cfg.SUS_DEBUG then print('SUS - Held Spell not found, returning vanilla XP') end
                     return xp
                 end
-                local max_mp     = Player.stats.dynamic.magicka(self).base
-                local mp_factor  = 0.01*types.max_mp
+                local max_mp     = types.Player.stats.dynamic.magicka(self).base
+                local mp_factor  = 0.01*max_mp
                 local multiplier = spell.cost/Cfg.Magicka_to_XP * 4.8/(4 + math.max(0, mp_factor - 1))
                 xp = xp * multiplier
 
@@ -482,16 +482,19 @@ Fn.make_scalers = function()
     -- ACROBATICS
 -----------------------------------------------------------------------------------------------------------
     Dt.scalers:new{ name = 'acrobatics', 
-        func = function(_, xp)
+        func = function(useType, xp)
             if not Cfg.enabled['acrobatics'] then return xp end
 
             local encumbered_mult = Cfg.Acrobatics_Encumbrance_Min + (Cfg.Acrobatics_Encumbrance_Max - Cfg.Acrobatics_Encumbrance_Min)
                                     * types.Actor.getEncumbrance(self) / (Dt.GMST.fEncumbranceStrMult * types.Player.stats.attributes.strength(self).base)
-            local recursive_mult  = (Cfg.Acrobatics_Start) / (1 + (Dt.counters.acrobatics(1) -1)/5)
+            local recursive_mult = 1
+            if useType == skp.SKILL_USE_TYPES.Acrobatics_Jump then
+                recursive_mult = (Cfg.Acrobatics_Start) / (1 + (Dt.counters.acrobatics(1) -1)/2)
+                Dt.pc.grounded = false -- We skip the next athletics use, bunny hopping isn't running.
+            end
             local multiplier = encumbered_mult * recursive_mult -- No fatigue% => no XP, and more weight% == less XP
             xp = xp * multiplier
-            if Cfg.SUS_DEBUG then print('SUS [Acrobatics] Skill Uses: '.. string.format('%.2f', multiplier)..' | Skill Progress: '..percentify(xp)..' | Jump Spam Mult: '.. string.format('%.2f', recursive_mult)) end
-            Dt.pc.grounded = false -- We skip the next athletics use, bunny hopping isn't running.
+            if Cfg.SUS_DEBUG then print('SUS [Acrobatics] Skill Uses: '.. string.format('%.2f', multiplier)..' | Skill Progress: '..percentify(xp)..' | Jump Mult: '.. string.format('%.2f', recursive_mult)) end
             return xp
         end
     }

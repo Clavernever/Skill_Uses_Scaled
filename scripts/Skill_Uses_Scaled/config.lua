@@ -33,7 +33,7 @@ Cfg.Unarmored_Decay_Time  = 30  --> [This] many seconds have to pass for a hit t
                                 -- | Only applies if you've got 3 or less empty slots (counting shield). Bonus is divided among those empty slots.
                                 -- | It's meant to make the heavy handicap from not being able to equip head and feet armor less bad, if you're running an armored character.
                                 -- | It's NOT meant to help, and will NOT affect, fully unarmored characters. Unarmored beast characters level the same as all others.
-Cfg.Acrobatics_Start      = 1.5 --> Acrobatics XP is multiplied by [This], and divided by [Recent Jumps]. The internal formula a lot more generous than the one used for Unarmored, as it's only meant to tone down spam jumping up hills.
+Cfg.Acrobatics_Start      = 2 --> Acrobatics XP is multiplied by [This], and divided by [Recent Jumps]. The internal formula a lot more generous than the one used for Unarmored, as it's only meant to tone down spam jumping up hills.
 Cfg.Acrobatics_Decay_Time = 5   --> [This] many seconds have to pass for an Acrobatics skill use to have no effect on XP from further uses.
 Cfg.Acrobatics_Encumbrance_Max = 0.5 --> At full carry weight, your skill progress will be multiplied by [this].
 Cfg.Acrobatics_Encumbrance_Min = 1.5 --> At empty carry weight, your skill progress will be multiplied by [this].
