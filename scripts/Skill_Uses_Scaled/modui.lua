@@ -23,7 +23,31 @@ local function array_concat(array, ...)
     return array
 end
 
+local function makeKeyEnum(keys) local result = {} for _, key in ipairs(keys) do result[key] = true end return result end
+
 local function edit_args(base, changes) for k, v in pairs(changes) do base[k] = v end return base end
+
+
+local Mui = {}
+
+Mui.presets = {prebuilt = {standard = {}}, custom = {}}
+
+Mui.SKILLS_MAP = makeKeyEnum(Dt.SKILLS)
+Mui.group_toggles = {
+    toggle_physical   = {'axe', 'bluntweapon', 'longblade', 'shortblade', 'spear', 'marksman', 'handtohand'}, --1~7
+    toggle_magic      = {'alteration', 'conjuration', 'destruction', 'illusion', 'mysticism', 'restoration'}, --8~13
+    toggle_armor      = {'heavyarmor', 'lightarmor', 'mediumarmor', 'block'}, --14~17
+    toggle_other      = {'armorer', 'enchant', 'alchemy', 'sneak', 'speechcraft', 'mercantile'}, --18~27
+}
+Mui.custom_keys = {
+    toggle_refund = true,
+}
+Mui.toggle = function(skillid, toggle)
+    if toggle then Cfg.enabled[skillid] = true
+    else Cfg.enabled[skillid] = false
+    end
+end
+
 
 settings.registerPage {
     key = 'susconfig',
@@ -32,17 +56,8 @@ settings.registerPage {
     description = 'Configure and toggle XP scaling based on the gameplay value of each skill use.\n All skills are configurable and can be toggled individually.\n Skills with similar behaviour are grouped together, for clarity and convenience.',
 }
 
-Mui = {}
-Mui.settings = {
-    new = function(self, t)
-        self[t.name] = t.name
-        return self[t.name]
-    end
-}
-
-local pc_cfg = {}
-pc_cfg.Settings_SUS_magic = {}
-pc_cfg.Settings_SUS_magic.args = {
+Mui.Settings_SUS_magic = {}
+Mui.Settings_SUS_magic.args = {
     MP_Refund_Skill_Offset = {l10n = 'Skill_Uses_Scaled', items = array_concat(num_range(1,25,1)  , num_range(30,100,5)), disabled = true},
     MP_Refund_Armor_mult   = {l10n = 'Skill_Uses_Scaled', items = array_concat(num_range(.1,.9,.1), num_range(1,3,0.1))  , disabled = true},
     MP_Refund_Max_Percent  = {l10n = 'Skill_Uses_Scaled', items = array_concat(num_range(1,25,1)  , num_range(30,100,5)), disabled = true},
@@ -74,21 +89,21 @@ settings.registerGroup {
             name        = 'Magic Refund Skill Offset',
             description = 'Magic skill is reduced by [This] for the calculation of Dynamic Spell Cost',
             renderer    = 'select',
-            argument    = pc_cfg.Settings_SUS_magic.args.MP_Refund_Skill_Offset,
+            argument    = Mui.Settings_SUS_magic.args.MP_Refund_Skill_Offset,
             default     = Cfg.MP_Refund_Skill_Offset,
         }, {
             key         = 'MP_Refund_Armor_mult',
             name        = 'Armor Penalty Offset',
             description = 'Magic skill is further reduced by [This]x[Equipped Armor Weight].\n If after all offsets your skill is still positive, you\'ll get a portion of the spell refunded, reducing spell cost. If the resulting number is negative, the "refund" will take extra magicka away instead, increasing spell cost.',
             renderer    = 'select',
-            argument    = pc_cfg.Settings_SUS_magic.args.MP_Refund_Armor_mult,
+            argument    = Mui.Settings_SUS_magic.args.MP_Refund_Armor_mult,
             default     = Cfg.MP_Refund_Armor_Mult,
         }, {
             key         = 'MP_Refund_Max_Percent',
             name        = 'Maximum Refund Percentage',
             description = 'Refund will never surpass [This]% of original spell cost. Note that this also affects armor penalties, if any.',
             renderer    = 'select',
-            argument    = pc_cfg.Settings_SUS_magic.args.MP_Refund_Max_Percent,
+            argument    = Mui.Settings_SUS_magic.args.MP_Refund_Max_Percent,
             default     = Cfg.MP_Refund_Max_Percent,
         },
         {key = 'toggle_magic', name = 'Enable XP Scaling for this Skill Group:', renderer = 'checkbox', default = 'true' },
@@ -101,7 +116,7 @@ settings.registerGroup {
     },
 }
 
-pc_cfg.Settings_SUS_physical = {}
+Mui.Settings_SUS_physical = {}
 settings.registerGroup {
     key         = 'Settings_SUS_physical',
     name        = 'Weapons and Hand To Hand',
@@ -143,7 +158,7 @@ settings.registerGroup {
     },
 }
 
-pc_cfg.Settings_SUS_armor = {}
+Mui.Settings_SUS_armor = {}
 settings.registerGroup {
     key         = 'Settings_SUS_armor',
     name        = 'Armor',
@@ -176,7 +191,7 @@ settings.registerGroup {
     },
 }
 
-pc_cfg.Settings_SUS_unarmored = {}
+Mui.Settings_SUS_unarmored = {}
 settings.registerGroup {
     key         = 'Settings_SUS_unarmored',
     name        = 'Unarmored',
@@ -219,7 +234,7 @@ settings.registerGroup {
     },
 }
 
-pc_cfg.Settings_SUS_acrobatics = {}
+Mui.Settings_SUS_acrobatics = {}
 settings.registerGroup {
     key         = 'Settings_SUS_acrobatics',
     name        = 'Acrobatics',
@@ -262,7 +277,7 @@ settings.registerGroup {
     },
 }
 
-pc_cfg.Settings_SUS_athletics = {}
+Mui.Settings_SUS_athletics = {}
 settings.registerGroup {
     key         = 'Settings_SUS_athletics',
     name        = 'Athletics',
@@ -319,7 +334,7 @@ settings.registerGroup {
     },
 }
 
-pc_cfg.Settings_SUS_security = {}
+Mui.Settings_SUS_security = {}
 settings.registerGroup {
     key         = 'Settings_SUS_security',
     name        = 'Security',
@@ -348,7 +363,20 @@ settings.registerGroup {
     },
 }
 
-pc_cfg.Settings_SUS_SUS_DEBUG = {}
+Mui.Settings_SUS_presets = {}
+settings.registerGroup {
+    key         = 'Settings_SUS_presets',
+    name        = 'Settings Presets',
+    description = 'Pick from available config presets, or save your current settings as a new preset for later use.',
+    page        = 'susconfig',
+    order       = 0,
+    l10n        = 'Skill_Uses_Scaled',
+    permanentStorage = true,
+    settings = {
+    },
+}
+
+Mui.Settings_SUS_SUS_DEBUG = {}
 settings.registerGroup {
     key         = 'Settings_SUS_SUS_DEBUG',
     name        = 'Info & Debug',
@@ -368,19 +396,21 @@ settings.registerGroup {
     },
 }
 
-pc_cfg.custom = function(group, key)
+
+
+Mui.custom = function(group, key)
     if key == 'toggle_refund' then
-        local args = pc_cfg.Settings_SUS_magic.args
+        local args = Mui.Settings_SUS_magic.args
         local offset = 'MP_Refund_Skill_Offset'
         local mult = 'MP_Refund_Armor_mult'
         local max = 'MP_Refund_Max_Percent'
-        if pc_cfg[group].section:get(key) then
-            Cfg.toggle('toggle_refund', true)
+        if Mui[group].section:get(key) then
+            Mui.toggle('toggle_refund', true)
             settings.updateRendererArgument(group, offset , edit_args(args[offset], {disabled = false}))
             settings.updateRendererArgument(group, mult   , edit_args(args[mult  ], {disabled = false}))
             settings.updateRendererArgument(group, max    , edit_args(args[max   ], {disabled = false}))
         else
-            Cfg.toggle('toggle_refund', nil)
+            Mui.toggle('toggle_refund', nil)
             settings.updateRendererArgument(group, offset, edit_args(args[offset], {disabled = true}))
             settings.updateRendererArgument(group, mult  , edit_args(args[mult  ], {disabled = true}))
             settings.updateRendererArgument(group, max   , edit_args(args[max   ], {disabled = true}))
@@ -388,35 +418,48 @@ pc_cfg.custom = function(group, key)
     end
 end
 
-pc_cfg.update = async:callback(function(group,key)
+Mui.update = async:callback(function(group,key)
     if (not group) or (not key) then return
-    elseif Cfg.group_toggles[key] then
-        for _, _skill in ipairs(Cfg.group_toggles[key]) do
-            if pc_cfg[group].section:get(key) then
-                Cfg.toggle(_skill, pc_cfg[group].section:get(_skill))
+    elseif Mui.group_toggles[key] then
+        for _, _skill in ipairs(Mui.group_toggles[key]) do
+            if Mui[group].section:get(key) then
+                Mui.toggle(_skill, Mui[group].section:get(_skill))
                 settings.updateRendererArgument(group, _skill, {disabled = false})
             else
-                Cfg.toggle(_skill, nil)
+                Mui.toggle(_skill, nil)
                 settings.updateRendererArgument(group, _skill, {disabled = true})
             end
             print(_skill..': '..tostring(Cfg.enabled[_skill]))
         end
-    elseif Cfg.custom[key] then
-        pc_cfg.custom(group, key)
+    elseif Mui.custom_keys[key] then
+        Mui.custom(group, key)
         print(key..'| Cfg.enabled? '..tostring(Cfg.enabled[key])..' | Cfg? '..tostring(Cfg[key]))
-    elseif Cfg.SKILLS_MAP[key] then
-        Cfg.toggle(key, pc_cfg[group].section:get(key))
+    elseif Mui.SKILLS_MAP[key] then
+        Mui.toggle(key, Mui[group].section:get(key))
         print(key..': '..tostring(Cfg.enabled[key]))
     else
-        Cfg[key] = pc_cfg[group].section:get(key)
+        Cfg[key] = Mui[group].section:get(key)
         if type(Cfg[key]) == 'number' then print(key..': '.. string.format('%.1f', Cfg[key]))
         else print(key..'| Cfg.enabled? '..tostring(Cfg.enabled[key])..' | Cfg? '..tostring(Cfg[key]))
         end
     end
 end)
 
-for _, name in ipairs{'physical', 'magic', 'armor', 'unarmored', 'acrobatics', 'athletics', 'security', 'SUS_DEBUG'} do
+for _, name in ipairs{'physical', 'magic', 'armor', 'unarmored', 'acrobatics', 'athletics', 'security', 'SUS_DEBUG'} do --, 'presets'
     local id = 'Settings_SUS_'..name
-    pc_cfg[id].section = storage.playerSection(id)
-    pc_cfg[id].section:subscribe(pc_cfg.update)
+    if Mui[id] then
+        Mui[id].section = storage.playerSection(id)
+        Mui[id].section:subscribe(Mui.update)
+    else print(id..' section is in the storage register list but not in the script tables.')
+    end
 end
+
+-- for k in pairs(initCfg) do
+--     if k ~= 'enabled' then
+--         if Cfg[k] == nil then Cfg[k] = initCfg[k] end
+--     else
+--         for k in pairs(initCfg.enabled) do
+--             if Cfg.enabled[k] == nil then Cfg.enabled[k] = initCfg.enabled[k] end
+--         end
+--     end
+-- end

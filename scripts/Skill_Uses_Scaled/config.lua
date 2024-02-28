@@ -58,29 +58,11 @@ Cfg.SUS_VERBOSE = false -- | You can use these messages to fine-tune your settin
                         -- | Also, remember this is always on top of your load order's XP values.
                         -- | If you have another mod that changes XP rates, be sure to check their changes as well.
 -----------------------------------------------------------------------------------------------------------
-
-local function makeKeyEnum(keys) local result = {} for _, key in ipairs(keys) do result[key] = true end return result end
-Cfg.SKILLS_MAP = makeKeyEnum(Dt.SKILLS)
-
-Cfg.enabled = {}
-for k in pairs(Cfg.SKILLS_MAP) do Cfg.enabled[k] = Cfg.SKILLS_MAP[k] end
-Cfg.enabled.toggle_refund = false
-
-Cfg.group_toggles = {
-    toggle_physical   = {'axe', 'bluntweapon', 'longblade', 'shortblade', 'spear', 'marksman', 'handtohand'}, --1~7
-    toggle_magic      = {'alteration', 'conjuration', 'destruction', 'illusion', 'mysticism', 'restoration'}, --8~13
-    toggle_armor      = {'heavyarmor', 'lightarmor', 'mediumarmor', 'block'}, --14~17
-    toggle_other      = {'armorer', 'enchant', 'alchemy', 'sneak', 'speechcraft', 'mercantile'}, --18~27
-}
-Cfg.custom = {
-    toggle_refund = true,
-}
-Cfg.toggle = function(skillid, toggle)
-    if toggle then Cfg.enabled[skillid] = true
-    else Cfg.enabled[skillid] = false
-    end
+if not Cfg.enabled then
+    Cfg.enabled = {}
+    for _, skill in pairs(Dt.SKILLS) do Cfg.enabled[skill] = true end
+    Cfg.enabled.toggle_refund = false
 end
-
 
 -- RETURN || NEED THIS SO FILE DO THING
 return Cfg
