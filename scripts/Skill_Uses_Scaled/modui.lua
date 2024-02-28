@@ -363,18 +363,18 @@ settings.registerGroup {
     },
 }
 
--- Mui.Settings_SUS_presets = {}
--- settings.registerGroup {
---     key         = 'Settings_SUS_presets',
---     name        = 'Settings Presets',
---     description = 'Pick from available config presets, or save your current settings as a new preset for later use.',
---     page        = 'susconfig',
---     order       = 0,
---     l10n        = 'Skill_Uses_Scaled',
---     permanentStorage = true,
---     settings = {
---     },
--- }
+Mui.Settings_SUS_presets = {}
+settings.registerGroup {
+    key         = 'Settings_SUS_presets',
+    name        = 'Settings Presets',
+    description = 'Pick from available config presets, or save your current settings as a new preset for later use.',
+    page        = 'susconfig',
+    order       = 0,
+    l10n        = 'Skill_Uses_Scaled',
+    permanentStorage = true,
+    settings = {
+    },
+}
 
 Mui.Settings_SUS_SUS_DEBUG = {}
 settings.registerGroup {
@@ -447,8 +447,11 @@ end)
 
 for _, name in ipairs{'physical', 'magic', 'armor', 'unarmored', 'acrobatics', 'athletics', 'security', 'SUS_DEBUG'} do --, 'presets'
     local id = 'Settings_SUS_'..name
-    Mui[id].section = storage.playerSection(id)
-    Mui[id].section:subscribe(Mui.update)
+    if Mui[id] then
+        Mui[id].section = storage.playerSection(id)
+        Mui[id].section:subscribe(Mui.update)
+    else print(id..' section is in the storage register list but not in the script tables.')
+    end
 end
 
 -- for k in pairs(initCfg) do
