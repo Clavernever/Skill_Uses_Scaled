@@ -52,12 +52,28 @@ local onFrame = function(dt)
     end
 end
 
+-- local onInit = function()
+-- end
+-- 
+-- local onSave = function()
+--     Cfg = Cfg
+-- end
+-- 
+-- local onLoad = function(data)
+--     Cfg = data.Cfg
+-- end
+
+-- local initCfg = require('scripts.Skill_Uses_Scaled.config')
+
+
 return {
     engineHandlers = {
         onActive = onActive,
         onUpdate = onUpdate,
         onFrame  = onFrame ,
-        onInit   = onInit  ,
+--         onInit   = onInit  ,
+--         onSave   = onSave  ,
+--         onLoad   = onLoad  ,
     },
     eventHandlers = {
         SUS_updateGLOBvar = function(t) Dt.GLOB[t.id] = t.val end,
