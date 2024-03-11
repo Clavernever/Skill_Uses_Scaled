@@ -37,20 +37,77 @@ end
 
 local Mui = {}
 
-Mui.presets = {default = {}, custom = {}, current = {}}
+Mui.presets = {
+	custom = {},
+	default = {
+    Magicka_to_XP              = 9     ,
+    MP_Refund_Skill_Offset     = 15    ,
+    MP_Refund_Armor_mult       = 0.5   ,
+    MP_Refund_Max_Percent      = 50    ,
+    toggle_refund              = false ,
+    toggle_magic               = true  ,
+    alteration      = true             ,
+    conjuration     = true             ,
+    destruction     = true             ,
+    illusion        = true             ,
+    mysticism       = true             ,
+    restoration     = true             ,
+    Physical_Damage_to_XP      = 15    ,
+    HandToHand_Strength        = 40    ,
+    toggle_physical            = true  ,
+    axe             = true             ,
+    bluntweapon     = true             ,
+    longblade       = true             ,
+    shortblade      = true             ,
+    spear           = true             ,
+    marksman        = true             ,
+    handtohand      = true             ,
+    Armor_Damage_To_XP         = 9     ,
+    Block_Damage_To_XP         = 9     ,
+    toggle_armor               = true  ,
+    heavyarmor      = true             ,
+    mediumarmor     = true             ,
+    lightarmor      = true             ,
+    block           = true             ,
+    Unarmored_Armor_Mult       = 0.5   ,
+    Unarmored_Start            = 3     ,
+    Unarmored_Min              = 0.1   ,
+    Unarmored_Decay_Time       = 30    ,
+  --Unarmored_Beast_Races      = 6     ,
+    unarmored       = true             ,
+    Acrobatics_Start           = 2     ,
+    Acrobatics_Decay_Time      = 5     ,
+    Acrobatics_Encumbrance_Max = 0.5   ,
+    Acrobatics_Encumbrance_Min = 1.5   ,
+    acrobatics      = true             ,
+    Athletics_Start            = 0.5   ,
+    Athletics_Marathon         = 2     ,
+    Athletics_Decay_Time       = 300   ,
+    Athletics_No_Move_Penalty  = 0.01  ,
+    Athletics_Encumbrance_Max  = 1.5   ,
+    Athletics_Encumbrance_Min  = 0.5   ,
+    athletics       = true             ,
+    Security_Lock_Points_To_XP = 20    ,
+    Security_Trap_Points_To_XP = 20    ,
+    security        = true             ,
+    SUS_DEBUG                  = false ,
+  --SUS_VERBOSE                = false ,
+	}
+}
 
 Mui.SKILLS_MAP = makeKeyEnum(Dt.SKILLS)
 Mui.toggles = {
   toggle_physical   = {'axe', 'bluntweapon', 'longblade', 'shortblade', 'spear', 'marksman', 'handtohand'}, --1~7
   toggle_magic      = {'alteration', 'conjuration', 'destruction', 'illusion', 'mysticism', 'restoration'}, --8~13
-  toggle_armor      = {'heavyarmor', 'lightarmor', 'mediumarmor', 'block'}, --14~17
-	toggle_refund     = {'MP_Refund_Skill_Offset', 'MP_Refund_Armor_mult', 'MP_Refund_Max_Percent'}
+  toggle_armor      = {'heavyarmor', 'lightarmor', 'mediumarmor', 'block'},                                 --14~17
+--toggle_refund     = {'MP_Refund_Skill_Offset', 'MP_Refund_Armor_mult', 'MP_Refund_Max_Percent'}
 }
 
 Mui.settingsGroups = {}
 function addSettingsGroup(name)
 	local groupid = "Settings_SUS_"..name
 	Mui[groupid] = {}
+	storage.playerSection(groupid):reset()
 	table.insert(Mui.settingsGroups, groupid)
 end
 
@@ -62,6 +119,11 @@ settings.registerPage {
 }
 
 addSettingsGroup('magic')
+Mui.Settings_SUS_magic.args = {
+    MP_Refund_Skill_Offset = {l10n = 'Skill_Uses_Scaled', items = array_concat(num_range(1,25,1)  , num_range(30,100,5)), disabled = true},
+    MP_Refund_Armor_mult   = {l10n = 'Skill_Uses_Scaled', items = array_concat(num_range(.1,.9,.1), num_range(1,3,0.1)) , disabled = true},
+    MP_Refund_Max_Percent  = {l10n = 'Skill_Uses_Scaled', items = array_concat(num_range(1,25,1)  , num_range(30,100,5)), disabled = true},
+}
 settings.registerGroup {
   key              = 'Settings_SUS_magic',
   name             = 'Magic Schools',
@@ -77,42 +139,42 @@ settings.registerGroup {
       description = 'How much spell cost is equivalent to one vanilla skill use.',
       renderer    = 'select',
       argument    = {l10n = 'Skill_Uses_Scaled', items = array_concat(num_range(1,25,1), num_range(30, 100, 5))},
-      default     = 9,
-    }, {
+      default     = Mui.presets.default.Magicka_to_XP,
+    },{
       key         = 'toggle_refund',
       name        = 'Dynamic Spell Cost',
       description = 'Toggling this on will make your spell\'s cost change depending on your gear and skill level, akin to spellcasting in Oblivion and Skyrim. High skill and no armor will result in a refund, while heavy armor and low skill will incur a penalty. Only applies on successful spellcasts.',
       renderer    = 'checkbox',
-      default     = false,
-    }, {
+      default     = Mui.presets.default.toggle_refund,
+    },{
       key         = 'MP_Refund_Skill_Offset',
-      name        = 'Magic Refund Skill Offset',
+      name        = 'Skill Offset',
       description = 'Magic skill is reduced by [This] for the calculation of Dynamic Spell Cost',
       renderer    = 'select',
       argument    = {l10n = 'Skill_Uses_Scaled', items = array_concat(num_range(1,25,1)  , num_range(30,100,5)), disabled = true},
-      default     = 15,
-    }, {
+      default     = Mui.presets.default.MP_Refund_Skill_Offset,
+    },{
       key         = 'MP_Refund_Armor_mult',
       name        = 'Armor Penalty Offset',
       description = 'Magic skill is further reduced by [This]x[Equipped Armor Weight].\n If after all offsets your skill is still positive, you\'ll get a portion of the spell refunded, reducing spell cost. If the resulting number is negative, the "refund" will take extra magicka away instead, increasing spell cost.',
       renderer    = 'select',
-      argument    = {l10n = 'Skill_Uses_Scaled', items = array_concat(num_range(.1,.9,.1), num_range(1,3,0.1))  , disabled = true},
-			default     = 0.5,
-    }, {
+      argument    = {l10n = 'Skill_Uses_Scaled', items = array_concat(num_range(.1,.9,.1), num_range(1,3,0.1)) , disabled = true},
+			default     = Mui.presets.default.MP_Refund_Armor_mult,
+    },{
       key         = 'MP_Refund_Max_Percent',
       name        = 'Maximum Refund Percentage',
-      description = 'Refund will never surpass [This]% of original spell cost. Note that this also affects armor penalties, if any.',
+      description = 'Refund will never surpass [This]% of original spell cost. This also affects cost increases from skill offset and armor weight, when applicable.',
       renderer    = 'select',
       argument    = {l10n = 'Skill_Uses_Scaled', items = array_concat(num_range(1,25,1)  , num_range(30,100,5)), disabled = true},
-      default     = 50,
+      default     = Mui.presets.default.MP_Refund_Max_Percent,
     },
-    {key = 'toggle_magic', name = 'Enable XP Scaling for this Skill Group:', renderer = 'checkbox', default = 'true' },
-    {key = 'alteration'  , name = 'Alteration' , renderer = 'checkbox', default = 'true'},
-    {key = 'conjuration' , name = 'Conjuration', renderer = 'checkbox', default = 'true'},
-    {key = 'destruction' , name = 'Destruction', renderer = 'checkbox', default = 'true'},
-    {key = 'illusion'    , name = 'Illusion'   , renderer = 'checkbox', default = 'true'},
-    {key = 'mysticism'   , name = 'Mysticism'  , renderer = 'checkbox', default = 'true'}, 
-    {key = 'restoration' , name = 'Restoration', renderer = 'checkbox', default = 'true'},
+    {key = 'toggle_magic', name = 'Enable XP Scaling for this Skill Group:', renderer = 'checkbox', default = Mui.presets.default.toggle_magic},
+    {key = 'alteration'  , name = 'Alteration' , renderer = 'checkbox', default = Mui.presets.default.alteration},
+    {key = 'conjuration' , name = 'Conjuration', renderer = 'checkbox', default = Mui.presets.default.conjuration},
+    {key = 'destruction' , name = 'Destruction', renderer = 'checkbox', default = Mui.presets.default.destruction},
+    {key = 'illusion'    , name = 'Illusion'   , renderer = 'checkbox', default = Mui.presets.default.illusion},
+    {key = 'mysticism'   , name = 'Mysticism'  , renderer = 'checkbox', default = Mui.presets.default.mysticism}, 
+    {key = 'restoration' , name = 'Restoration', renderer = 'checkbox', default = Mui.presets.default.restoration},
   },
 }
 
@@ -132,23 +194,23 @@ settings.registerGroup {
       description = 'How much outgoing damage is equivalent to one vanilla skill use.\n Not affected by enemy Armor Rating or by game difficulty.',
       renderer    = 'select',
       argument    = {l10n = 'Skill_Uses_Scaled',items = array_concat(num_range(1,25,1), num_range(30, 100, 5))},
-      default     = 15,
-    }, {
+      default     = Mui.presets.default.Physical_Damage_to_XP,
+    },{
       key         = 'HandToHand_Strength',
       name        = 'Factor Strength into Hand to Hand',
       description = 'H2H damage is multiplied by [STR]/[This] when calculating XP.\n Default is same as OpenMW\'s.\n Set to 1 to disable.\n Does not affect Werewolves, since (due to how the game works) you don\'t get XP from attacking while in Werewolf form.',
       renderer    = 'select',
       argument    = {l10n = 'Skill_Uses_Scaled', items = array_concat(num_range(1,9,1), num_range(10, 100, 5))},
-      default     = 40,
+      default     = Mui.presets.default.HandToHand_Strength,
     }, 
-    {key = 'toggle_physical', name = 'Enable XP Scaling for this Skill Group:', renderer = 'checkbox', default = 'true',}, 
-    {key = 'axe'            , name = 'Axe'         , renderer = 'checkbox', default = 'true'},
-    {key = 'bluntweapon'    , name = 'Blunt Weapon', renderer = 'checkbox', default = 'true'},
-    {key = 'longblade'      , name = 'Long Blade'  , renderer = 'checkbox', default = 'true'},
-    {key = 'shortblade'     , name = 'Short Blade' , renderer = 'checkbox', default = 'true'},
-    {key = 'spear'          , name = 'Spear'       , renderer = 'checkbox', default = 'true'},
-    {key = 'marksman'       , name = 'Marksman'    , renderer = 'checkbox', default = 'true'}, 
-    {key = 'handtohand'     , name = 'Hand To Hand', renderer = 'checkbox', default = 'true'},
+    {key = 'toggle_physical', name = 'Enable XP Scaling for this Skill Group:', renderer = 'checkbox', default = Mui.presets.default.toggle_physical}, 
+    {key = 'axe'            , name = 'Axe'         , renderer = 'checkbox', default = Mui.presets.default.axe},
+    {key = 'bluntweapon'    , name = 'Blunt Weapon', renderer = 'checkbox', default = Mui.presets.default.bluntweapon},
+    {key = 'longblade'      , name = 'Long Blade'  , renderer = 'checkbox', default = Mui.presets.default.longblade},
+    {key = 'shortblade'     , name = 'Short Blade' , renderer = 'checkbox', default = Mui.presets.default.shortblade},
+    {key = 'spear'          , name = 'Spear'       , renderer = 'checkbox', default = Mui.presets.default.spear},
+    {key = 'marksman'       , name = 'Marksman'    , renderer = 'checkbox', default = Mui.presets.default.marksman}, 
+    {key = 'handtohand'     , name = 'Hand To Hand', renderer = 'checkbox', default = Mui.presets.default.handtohand},
   },
 }
 
@@ -168,24 +230,24 @@ settings.registerGroup {
       description = 'How much incoming damage is equivalent to one vanilla skill use.\n Not affected by your Armor Rating or by game difficulty.',
       renderer    = 'select',
       argument    = {l10n  = 'Skill_Uses_Scaled', items = array_concat(num_range(1,25,1), num_range(30, 100, 5))},
-      default     = 9,
-    }, {
+      default     = Mui.presets.default.Armor_Damage_To_XP,
+    },{
       key         = 'Block_Damage_To_XP',
       name        = 'Block - Damage to XP',
       description = 'How much blocked damage is equivalent to one vanilla skill use.\n Remember that blocked hits are prevented completely.',
       renderer    = 'select',
       argument    = {l10n  = 'Skill_Uses_Scaled', items = array_concat(num_range(1,25,1), num_range(30, 100, 5))},
-      default     = 9,
+      default     = Mui.presets.default.Block_Damage_To_XP,
     }, 
-    {key = 'toggle_armor', name = 'Enable Scaling for this Skill Group:', renderer = 'checkbox', default = 'true'}, 
-    {key = 'heavyarmor'  , name = 'Heavy Armor'  , renderer = 'checkbox', default = 'true',}, 
-    {key = 'mediumarmor' , name = 'Medium Armor' , renderer = 'checkbox', default = 'true',}, 
-    {key = 'lightarmor'  , name = 'Light Armor'  , renderer = 'checkbox', default = 'true'}, 
-    {key = 'block'       , name = 'Block'        , renderer = 'checkbox', default = 'true'},
+    {key = 'toggle_armor', name = 'Enable Scaling for this Skill Group:', renderer = 'checkbox', default = Mui.presets.default.toggle_armor}, 
+    {key = 'heavyarmor'  , name = 'Heavy Armor'  , renderer = 'checkbox', default = Mui.presets.default.heavyarmor}, 
+    {key = 'mediumarmor' , name = 'Medium Armor' , renderer = 'checkbox', default = Mui.presets.default.mediumarmor}, 
+    {key = 'lightarmor'  , name = 'Light Armor'  , renderer = 'checkbox', default = Mui.presets.default.lightarmor}, 
+    {key = 'block'       , name = 'Block'        , renderer = 'checkbox', default = Mui.presets.default.block},
   },
 }
 
-addSettingsGroup('unarmored ')
+addSettingsGroup('unarmored')
 settings.registerGroup {
   key              = 'Settings_SUS_unarmored',
   name             = 'Unarmored',
@@ -201,37 +263,37 @@ settings.registerGroup {
       description = 'The first hit you take is equivalent to [This] many vanilla skill uses.\n This multiplier is drastically reduced on each consecutive hit.',
       renderer    = 'select',
       argument    = {l10n  = 'Skill_Uses_Scaled', items = array_concat(num_range(.5,5,.25), num_range(6,15,1))},
-      default     = 3,
-    }, {
+      default     = Mui.presets.default.Unarmored_Start,
+    },{
       key         = 'Unarmored_Decay_Time',
       name        = 'Penalty Timer',
       description = 'The Starting Multiplier is restored in [This] many seconds.\n The higher this is, the harder it is to keep XP rates high in long battles',
       renderer    = 'select',
       argument    = {l10n  = 'Skill_Uses_Scaled', items = array_concat(num_range(1,25,1), num_range(30,100,5), num_range(120,600,20))},
-      default     = 30,
-    }, {
+      default     = Mui.presets.default.Unarmored_Decay_Time,
+    },{
       key         = 'Unarmored_Min',
       name        = 'Minimum Multiplier',
       description = 'The more you get hit, the closer the XP multiplier gets to [This] many vanilla skill uses.',
       renderer    = 'select',
       argument    = {l10n  = 'Skill_Uses_Scaled', items = array_concat(num_range(-1,1,.1), num_range(1.25,5,.25))},
-      default     = 0.1,
-    }, {
+      default     = Mui.presets.default.Unarmored_Min,
+    },{
       key         = 'Unarmored_Armor_Mult',
       name        = 'Armor Weight Penalty Multiplier',
       description = 'Weight of equipped armor will slow down unarmored XP gain. Weight is multiplied by [This] before being added to the XP formula.\n This mechanic further encourages using Unarmored either by itself or along light armor.',
       renderer    = 'select',
       argument    = {l10n  = 'Skill_Uses_Scaled', items = array_concat(num_range(-1,1,.1), num_range(1.25,5,.25))},
-      default     = 0.5,
---     }, {
---       key         = 'Unarmored_Beast_Races',
---       name        = 'Armored Beast Bonus',
---       description = 'When playing an Argonian or Khajiit, XP from hits to Head and Feet (if they are unarmored) will be multiplied by [This].\n This bonus is meant to mitigate the Armor Rating penalty for beast characters that run full armor sets, and has no effect on beast characters that don\'t use armor.',
---       renderer    = 'select',
---       argument    = {l10n  = 'Skill_Uses_Scaled', items = array_concat(num_range(-1,1,.1), num_range(1.25,5,.25))},
---       default     = 6,
+      default     = Mui.presets.default.Unarmored_Armor_Mult,
+--  },{
+--    key         = 'Unarmored_Beast_Races',
+--    name        = 'Armored Beast Bonus',
+--    description = 'When playing an Argonian or Khajiit, XP from hits to Head and Feet (if they are unarmored) will be multiplied by [This].\n This bonus is meant to mitigate the Armor Rating penalty for beast characters that run full armor sets, and has no effect on beast characters that don\'t use armor.',
+--    renderer    = 'select',
+--    argument    = {l10n  = 'Skill_Uses_Scaled', items = array_concat(num_range(-1,1,.1), num_range(1.25,5,.25))},
+--    default     = 6,
     }, 
-    {key = 'unarmored', name = 'Enable scaling for Unarmored XP:', renderer = 'checkbox', default = 'true'},
+    {key = 'unarmored', name = 'Enable scaling for Unarmored XP:', renderer = 'checkbox', default = Mui.presets.default.unarmored},
   },
 }
 
@@ -251,30 +313,30 @@ settings.registerGroup {
       description = 'The first jump you make is equivalent to [This] many vanilla skill uses.\n This multiplier is reduced on each consecutive jump.',
       renderer    = 'select',
       argument    = {l10n  = 'Skill_Uses_Scaled', items = array_concat(num_range(.25,5,.25), num_range(6,15,1))},
-      default     = 2,
-    }, {
+      default     = Mui.presets.default.Acrobatics_Start,
+    },{
       key         = 'Acrobatics_Decay_Time',
       name        = 'Penalty Timer',
       description = 'The Starting Multiplier is restored in [This] many seconds. Increasing this number makes spam jumping even less valuable.',
       renderer    = 'select',
       argument    = {l10n  = 'Skill_Uses_Scaled', items = array_concat(num_range(1,25,1), num_range(30,100,5), num_range(120,600,20))},
-      default     = 5,
-    }, {
+      default     = Mui.presets.default.Acrobatics_Decay_Time,
+    },{
       key         = 'Acrobatics_Encumbrance_Min',
       name        = 'Low Encumbrance Bonus',
       description = 'At 0% carry weight, your skill progress will be multiplied by [this].',
       renderer    = 'select',
       argument    = {l10n  = 'Skill_Uses_Scaled', items = array_concat(num_range(.25,5,.25), num_range(6,15,1))},
-      default     = 0.5,
-    }, {
+      default     = Mui.presets.default.Acrobatics_Encumbrance_Min,
+    },{
       key         = 'Acrobatics_Encumbrance_Max',
       name        = 'High Encumbrance Penalty',
       description = 'At 100% carry weight, your skill progress will be multiplied by [this].',
       renderer    = 'select',
       argument    = {l10n  = 'Skill_Uses_Scaled', items = array_concat(num_range(.25,5,.25), num_range(6,15,1))},
-      default     = 1.5,
+      default     = Mui.presets.default.Acrobatics_Encumbrance_Max,
     }, 
-    {key = 'acrobatics', name = 'Enable scaling for Acrobatics XP:', renderer = 'checkbox', default = 'true'},
+    {key = 'acrobatics', name = 'Enable scaling for Acrobatics XP:', renderer = 'checkbox', default = Mui.presets.default.acrobatics},
   },
 }
 
@@ -294,44 +356,44 @@ settings.registerGroup {
       description = 'Athletics XP is multiplied by a [Marathon Bonus]. This is the lowest it can get. \n Note that by default this is 0.5, meaning it cuts your XP in half when moving short distances and making long stops.',
       renderer    = 'select',
       argument    = {l10n  = 'Skill_Uses_Scaled', items = array_concat(num_range(.25,5,.25), num_range(6,15,1))},
-      default     = 0.5,
-    }, {
+      default     = Mui.presets.default.Athletics_Start,
+    },{
       key         = 'Athletics_Decay_Time',
       name        = 'Marathon Timer',
       description = 'It takes [This] many seconds of continuous running or swimming to reach the Maximum Multiplier.\n It\'s increase and decrease are gradual, so you can stop for a few seconds and you won\'t lose your entire progress.',
       renderer    = 'select',
       argument    = {l10n  = 'Skill_Uses_Scaled', items = array_concat(num_range(30,100,5), num_range(120,600,20), num_range(660,1200,60))},
-      default     = 300,
-    }, {
+      default     = Mui.presets.default.Athletics_Decay_Time,
+    },{
       key         = 'Athletics_Marathon',
       name        = 'Maximum Multiplier',
       description = 'Athletics XP is multiplied by a [Marathon Bonus]. This is the highest it can get.',
       renderer    = 'select',
       argument    = {l10n  = 'Skill_Uses_Scaled', items = array_concat(num_range(.25,5,.25), num_range(6,15,1))},
-      default     = 2,
-    }, {
+      default     = Mui.presets.default.Athletics_Marathon,
+    },{
       key         = 'Athletics_No_Move_Penalty',
       name        = 'No Movement Penalty',
       description = 'While not significantly moving (i.e, running or swimming into a wall), XP will be multiplied by [This].\n By default, it\'s low enough to make maxing the skill this way take very long, but still allows \'training\' AFK.',
       renderer    = 'select',
       argument    = {l10n  = 'Skill_Uses_Scaled', items = array_concat(num_range(-1,-0.1,0.1), num_range(-0.09,0.09,0.01), num_range(0.1,1,0.1))},
-      default     = 0.01,
-    }, {
+      default     = Mui.presets.default.Athletics_No_Move_Penalty,
+    },{
       key         = 'Athletics_Encumbrance_Max',
       name        = 'High Encumbrance Bonus',
       description = 'At 100% carry weight, your skill progress will be multiplied by [this].',
       renderer    = 'select',
       argument    = {l10n  = 'Skill_Uses_Scaled', items = array_concat(num_range(.25,5,.25), num_range(6,15,1))},
-      default     = 1.5,
-    }, {
+      default     = Mui.presets.default.Athletics_Encumbrance_Max,
+    },{
       key         = 'Athletics_Encumbrance_Min',
       name        = 'Low Encumbrance Penalty',
       description = 'At 0% carry weight, your skill progress will be multiplied by [this].',
       renderer    = 'select',
       argument    = {l10n  = 'Skill_Uses_Scaled', items = array_concat(num_range(.25,5,.25), num_range(6,15,1))},
-      default     = 0.5,
+      default     = Mui.presets.default.Athletics_Encumbrance_Min,
     }, 
-    {key = 'athletics', name = 'Enable scaling for Athletics XP:', renderer = 'checkbox', default = 'true'},
+    {key = 'athletics', name = 'Enable scaling for Athletics XP:', renderer = 'checkbox', default = Mui.presets.default.athletics},
   },
 }
 
@@ -351,35 +413,50 @@ settings.registerGroup {
       description = 'How many lock points are equivalent to one vanilla skill use.\n Not affected by tool quality.',
       renderer    = 'select',
       argument    = {l10n  = 'Skill_Uses_Scaled', items = array_concat(num_range(1,25,1), num_range(30, 100, 5))},
-      default     = 20,
-    },    {
+      default     = Mui.presets.default.Security_Lock_Points_To_XP,
+    },{
       key         = 'Security_Trap_Points_To_XP',
       name        = 'Trap Difficulty to XP',
       description = 'How many trap points are equivalent to one vanilla skill use.\n Not affected by tool quality.\n Note that trap difficulty is independent from lock difficulty, and directly based on the trap spell\'s magic cost. Hard traps are generally dangerous, and easy ones mostly harmless.',
       renderer    = 'select',
       argument    = {l10n  = 'Skill_Uses_Scaled', items = array_concat(num_range(1,25,1), num_range(30, 100, 5))},
-      default     = 20,
+      default     = Mui.presets.default.Security_Trap_Points_To_XP,
     },
-    {key = 'security', name = 'Enable scaling for Security XP:', renderer = 'checkbox', default = 'true'},
+    {key = 'security', name = 'Enable scaling for Security XP:', renderer = 'checkbox', default = Mui.presets.default.security},
   },
 }
 
-addSettingsGroup('presets')
-settings.registerGroup {
-  key              = 'Settings_SUS_presets',
-  name             = 'Settings Presets',
-  description      = 'Pick from available config presets, or save your current settings as a new preset for later use.',
-  page             = 'susconfig',
-  order            = 0,
-  l10n             = 'Skill_Uses_Scaled',
-  permanentStorage = true,
-  settings         = {
-  },
-}
+--addSettingsGroup('presets')
+--settings.registerGroup {
+--  key              = 'Settings_SUS_presets',
+--  name             = 'Settings Presets',
+--  description      = 'Pick from available config presets, or save your current settings as a new preset for later use.',
+--  page             = 'susconfig',
+--  order            = 0,
+--  l10n             = 'Skill_Uses_Scaled',
+--  permanentStorage = true,
+--  settings         = {
+--	--{
+--  --  key         = 'Security_Trap_Points_To_XP',
+--  --  name        = 'Trap Difficulty to XP',
+--  --  description = 'How many trap points are equivalent to one vanilla skill use.\n Not affected by tool quality.\n Note that trap difficulty is independent from lock difficulty, and directly based on the trap spell\'s magic cost. Hard traps are generally dangerous, and easy ones mostly harmless.',
+--  --  renderer    = 'select',
+--  --  argument    = {l10n  = 'Skill_Uses_Scaled', items = array_concat(num_range(1,25,1), num_range(30, 100, 5))},
+--  --  default     = Mui.presets.default.Security_Trap_Points_To_XP,
+--  --},{
+--  --  key         = 'Security_Trap_Points_To_XP',
+--  --  name        = 'Trap Difficulty to XP',
+--  --  description = 'How many trap points are equivalent to one vanilla skill use.\n Not affected by tool quality.\n Note that trap difficulty is independent from lock difficulty, and directly based on the trap spell\'s magic cost. Hard traps are generally dangerous, and easy ones mostly harmless.',
+--  --  renderer    = 'select',
+--  --  argument    = {l10n  = 'Skill_Uses_Scaled', items = array_concat(num_range(1,25,1), num_range(30, 100, 5))},
+--  --  default     = Mui.presets.default.Security_Trap_Points_To_XP,
+--  --},
+--  },
+--}
 
 addSettingsGroup('DEBUG')
 settings.registerGroup {
-  key              = 'Settings_SUS_SUS_DEBUG',
+  key              = 'Settings_SUS_DEBUG',
   name             = 'Info & Debug',
   description      = '',
   page             = 'susconfig',
@@ -388,15 +465,18 @@ settings.registerGroup {
   permanentStorage = false,
   settings         = {
     {
-    key         = 'SUS_DEBUG', name = 'Enable Debug Messages', renderer = 'checkbox', default = false,
+    key         = 'SUS_DEBUG', name = 'Enable Debug Messages', renderer = 'checkbox', default = Mui.presets.default.SUS_DEBUG,
     description = 'Print information on every skill use about XP gained (and about this mod\'s multipliers) to the in-game F10 console.\n Useful for anyone wishing to hone in their configuration, or to get a general idea of this mod\'s (and vanilla morrowind\'s) XP mechanics.'
 --     }, {
---     key = 'id', name = 'Use Verbose Messaging', renderer = 'checkbox', default = true,
+--     key = 'SUS_VERBOSE', name = 'Use Verbose Messaging', renderer = 'checkbox', default = Mui.presets.default.SUS_VERBOSE,
 --     description = 'Show fancy messageboxes directly to your screen instead of to the F10 console.\n Enabled by Default.\n Whether this is more or less intrusive than the F10 window is a matter of opinion.. disable it if you prefer the console.'
     },
   },
 }
 
+Mui.custom_groups = {
+	toggle_refund = true,
+}
 Mui.custom = function(group, key)
   if key == 'toggle_refund' then
     local args   = Mui.Settings_SUS_magic.args
@@ -404,9 +484,9 @@ Mui.custom = function(group, key)
     local mult   = 'MP_Refund_Armor_mult'
     local max    = 'MP_Refund_Max_Percent'
     if Mui[group].section:get(key) then
-      settings.updateRendererArgument(group, offset , edit_args(args[offset], {disabled = false}))
-      settings.updateRendererArgument(group, mult   , edit_args(args[mult  ], {disabled = false}))
-      settings.updateRendererArgument(group, max    , edit_args(args[max   ], {disabled = false}))
+      settings.updateRendererArgument(group, offset, edit_args(args[offset], {disabled = false}))
+      settings.updateRendererArgument(group, mult  , edit_args(args[mult  ], {disabled = false}))
+      settings.updateRendererArgument(group, max   , edit_args(args[max   ], {disabled = false}))
     else
       settings.updateRendererArgument(group, offset, edit_args(args[offset], {disabled = true}))
       settings.updateRendererArgument(group, mult  , edit_args(args[mult  ], {disabled = true}))
@@ -416,63 +496,61 @@ Mui.custom = function(group, key)
 end
 
 Mui.update = async:callback(function(group,key)
+	if key == nil then print(group..': nil key') end
   if (not group) or (not key) then return
   elseif Mui.toggles[key] then
-		local toggle = Mui[group].section:get(key)
+		local toggled = Mui[group].section:get(key)
     for _, setting in ipairs(Mui.toggles[key]) do
-      settings.updateRendererArgument(group, setting, {disabled = toggle})
-      print(setting..': '..tostring(Mui[group].section:get(setting)))
+      settings.updateRendererArgument(group, setting, {disabled = not toggled})
+      if (not toggled) and Mui.getSetting("SUS_DEBUG") then print(setting..': '..tostring(Mui[group].section:get(setting))) end
     end
-  elseif Mui.SKILLS_MAP[key] then
-    print(key..': '..tostring(Mui[group].section:get(key)))
+    if Mui.getSetting("SUS_DEBUG") then print(key..': '..tostring(Mui[group].section:get(key))) end
+	elseif Mui.custom_groups[key] then
+		Mui.custom(group, key)
   else
-    Cfg[key] = Mui[group].section:get(key)
-    if type(Cfg[key]) == 'number' then print(key..': '.. string.format('%.1f', Cfg[key]))
-    else print(key..'| Cfg.enabled? '..tostring(Mui[group].section:get(key))..' | Cfg? '..tostring(Cfg[key]))
+    if type(Mui[group].section:get(key)) == 'number' then
+			if Mui.getSetting("SUS_DEBUG") then print(key..': '.. string.format('%.1f', Mui[group].section:get(key))) end
+    else
+      if Mui.getSetting("SUS_DEBUG") then print(key..': '..tostring(Mui[group].section:get(key))) end
     end
   end
+	--Mui.savePreset('current')
 end)
 
 Mui.GROUPS_MAP = {}
 for _, groupid in ipairs(Mui.settingsGroups) do 
   Mui[groupid].section = storage.playerSection(groupid)
   Mui[groupid].section:subscribe(Mui.update)
-	for key in pairs(Mui[groupid].section:asTable) do 
+	for key in pairs(Mui[groupid].section:asTable()) do 
 		Mui.GROUPS_MAP[key] = Mui[groupid].section
 	end
 end
 
--- • Settings loading:
-function loadSettings(current, target)
-  for k in pairs(target) do
-    if k ~= 'enabled' then
-      current[k] = get(target[k])
-    else
-      for k2 in pairs(target.enabled) do
-        current.enabled[k2] = get(target.enabled[k2])
-      end
-    end
-  end  
+Mui.getSetting = function(settingid)
+  return Mui.GROUPS_MAP[settingid]:get(settingid)
 end
-function loadMissingSettings(current, target)
-  for k in pairs(target) do
-    if k ~= 'enabled' then
-      if current[k] == nil then current[k] = get(target[k]) end
-    else
-      for k2 in pairs(target.enabled) do
-        if current.enabled[k2] == nil then current.enabled[k2] = get(target.enabled[k2]) end
-      end
-    end
-  end  
-end     
-      
-function savePreset(name)
+Mui.savePreset = function(name)
   local preset = {}
   for _, groupid in ipairs (Mui.settingsGroups) do
-    local preset[groupid] = get(Mui[groupid])
+		for k, v in pairs(Mui[groupid].section:asTable()) do
+		  preset[k] = v
+      if Mui.getSetting("SUS_DEBUG") then print('Saving... '..k..': '..tostring(v)) end
+		end
   end
-  --[[save section as "SUS_CustomPresets_"..name]]
-end     
+  storage.playerSection("SUS_Presets"):set(name, preset)
+end
+Mui.loadPreset = function(name)
+	local target_as_table = storage.playerSection("SUS_Presets"):asTable()[name]
+	if target_as_table == nil then print("[Loading defaults]") target_as_table = Mui.presets.default end
+  for _, groupid in ipairs(Mui.settingsGroups) do 
+  	for k, v in pairs (Mui[groupid].section:asTable()) do
+			if target_as_table[k] ~= nil then
+        Mui[groupid].section:set(k, target_as_table[k])
+		  end
+  	end
+  end
+end
+
 --  Saving:
 -- • Default "standard" preset = initCfg
 -- • onLoad, Cfg = Mui.Storage[Settings_SUS_Current].section:getAll
@@ -480,7 +558,4 @@ end
 -- • onSave, Settings_SUS_Current].section = Cfg
 -- Custom presets
 -- • on preset save:
-      
-      
-      
-      
+return Mui

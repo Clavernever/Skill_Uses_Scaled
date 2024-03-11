@@ -41,7 +41,7 @@ local onFrame = function(dt)
   if Dt.securiting then
     local target = Fn.get_security_target()
     if target then Dt.pc.security_target = target end
-    if getSetting(SUS_DEBUG) then -- I'd love to not have this here, but it's better to have it.
+    if Mui.getSetting("SUS_DEBUG") then -- I'd love to not have this here, but it's better to have it.
       local printcounter = Dt.counters.security(1)
       if printcounter > 150.01 then
         print('Scanning lockables...')
@@ -51,23 +51,24 @@ local onFrame = function(dt)
   end
 end
 
--- local onInit = function()
--- end
--- 
--- local onSave = function()
--- end
--- 
--- local onLoad = function(data)
--- end
+local onInit = function()
+	Mui.savePreset('current')
+end
+local onSave = function()
+	Mui.savePreset('current')
+end
+local onLoad = function(_)
+	Mui.loadPreset('current')
+end
 
 return {
   engineHandlers = {
     onActive = onActive,
     onUpdate = onUpdate,
     onFrame  = onFrame ,
---     onInit   = onInit  ,
---     onSave   = onSave  ,
---     onLoad   = onLoad  ,
+    onInit   = onInit  ,
+    onSave   = onSave  ,
+    onLoad   = onLoad  ,
   },
   eventHandlers = {
     SUS_updateGLOBvar = function(t) Dt.GLOB[t.id] = t.val end,
