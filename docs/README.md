@@ -11,51 +11,110 @@
         > Reward big things too much and you'll end up with accidental powerleveling.  
         > Nerf small things too hard and you end up with neverleveling..  
         > ..or worse, with expensive things being the only option.  
-    - Toning down things that scale with themselves.
-        > This goes back to the 1st section, but let's just say it's not surprising weapon skills increase fast.  
-        > Not only do you use them a lot, but you also get more hits at higher skill levels, which results in more XP, which results in more levels...  
-        > Weapon XP requirements are basically a flat constant diguised as a linear slope.  
+    - Skills that progress faster as they increase were weighted around midgame values to keep them both accessible and hard to max. The result should be a more balanced XP curve, more enjoyable and less exploitable from start to end, across all skills.
 
 - **Values in [brackets] indicate you can tweak them with a setting.**  
-
-
-## TRACKABLE SKILLS
-
-> All of these skills scale with their ideal variables.  
-> They may receive balance tweaks, but are unlikely to change in core behavior.
-
-#### Armor (Light/Medium/Heavy)
-
-- [x] Armor XP scales positively with pre-mitigation damage received, and with current armor skill.  
-    
-    `  XP Multiplier = Damage/[6] * 60 / (30 + Skill)  `
-    
-    - You benefit little from getting hit by rats and other vermin.
-    - Early armor levels are easier to get. Later ones harder.
-    - Your Armor Rating / Armor Quality does not meaningfully affect XP rates, your _skill_ does.
-      > There really isn't much more to say.. armor scaling is very clean. It _just works_.
 
 #### Magic
 - [x] Magic XP scales positively with Spell Cost, and less positively with Max MP.
 
-    `  XP Multiplier = Spellcost/[9] *4.8 /(4 + xINT + FortifyMP/100)  `
+    `  XP Multiplier = Spellcost/[9] * 4.8 /(4 + <MP over 100>/100)  `
 
-    > Cast chance is not accounted for, and failing still gives zero XP. This is on purpose.  
-    > If you have trouble casting use cheaper spells, it's what they're _actually_ meant for.
+    - Note that while large magicka pools will result in less XP _per spell_, they'll still result in more XP _per full magicka bar._
+        > Cast chance is not accounted for, and failing still gives zero XP. This is on purpose.   
+        > If you have trouble casting then use cheaper spells, it's what they're _actually_ meant for.
 
-- There is an MP refund, and the formula is way too convoluted to explain here.  
-    All you need to know is what follows:  
-    - On default settings, refund starts at 15 skill and goes up to ~28% at 100.  
-    - Refund keeps increasing after 100: you'll get ~33% at 150, 40% at 300, 43% at 600, etc. You'll never go over 50%.  
-    - Half your total armor weight is deducted from your skill value when refund is calculated.  
+- [x] Dynamic Spell Cost: it's an optional feature, disabled by default but highly recommended if you like Oblivion's and Skyrim's spell cost mechanics, where costs decrease at as you become proficcient and increase while wearing heavy gear.  
+    The formula is way too convoluted to explain here, but here's the gist of it:  
+    - On default settings, you get up to ~28% of spell cost refunded at 100 magic skill.  
+    - Refund keeps increasing after 100 (in case you have fortified your skill or use a skill uncapper): you'll get ~33% at 150, 40% at 300, 43% at 600, etc. You'll never go over 50%.  
+    - Half your total armor weight is deducted from your skill value when Dynamic Cost is calculated.  
         Can be disabled if you're already using another mod that adds an armor penalty. [Co.Re](https://www.nexusmods.com/morrowind/mods/53663) comes to mind.  
-        > This CAN send "refunds" into the negative, if your armor is heavy enough or your skill is too low.  
+        > If the resulting skill value is under zero (due to heavy armor and a low spellcasting skill), the spell's cost will be _increased_ instead.  
         > Under normal gameplay, the resulting penalty shouldn't increase spell cost by more than 50%.  
-    - Bigger spells get a smaller refund %, but will always result in more magicka recovered per spell cast.  
+    - Bigger spells are less affected by Dynamic Cost, both for discounts and penalties, but still benefit/suffer from them.  
         > This gives pure mages a reason to use small spells, without punishing them for using large ones.  
-        > Note that this also affects penalties from heavy armor..  
-        > ..a smaller negative refund means a big spell's cost is _increased less_.  
- 
+        > Likewise, mages in heavy armor will want to use the largest spells they can, to pay a smaller premium in penalties.
+
+#### Physical Attacks (Melee and Ranged weapons, as well as Hand to Hand)
+
+- [x] Physical XP scales with your outgoing Physical damage.
+    
+    `  XP Multiplier = Damage/[15] * 80 /(40 + Skill)  `
+    
+    - XP per combat enocunter will be mainly determined by _enemy HP_ rather than by how a$$ your weapon's minimal damage is.
+    - Like with Armor, damage is counted before your difficulty slider takes effect.
+        > So the effect of difficulty (if any) on weapon leveling is the same as vanilla.  
+    - Any enchantments on your weapons do not contribute to your leveling progress.
+        > When enchanting scaling is added, weapon enchantments will be used there.  
+    - Hand to Hand additionally has a setting to let you factor in Strength.
+        > It's toggled on by default and you should disable it only if you don't use the 'Strength affects Hand to Hand' option in the launcher.  
+        > It does not affect Werewolves, as the game doesn't give any H2H experience when in werewolf form.  
+
+#### Armor (Light/Medium/Heavy) and Block
+
+- [x] Armor and Block XP scale with pre-mitigation damage received.  
+    
+    `  XP Multiplier = Damage/[9] * 60 / (30 + Skill)  `
+    
+    - You benefit little from getting hit by rats and other vermin.
+    - Your Armor Rating / Armor Quality does not meaningfully affect XP rates, but of course surviving more damage will result in more XP.
+      > There really isn't much more to say.. armor scaling is very clean. It _just works_.
+
+#### Unarmored
+
+- [x] Unarmored XP scales positively with not getting hit and negatively with armor weight.  
+
+    `  XP Multiplier = 100 / (35 + rating + skill + [armor weight]) * ([3 - 0.1] / (2 * <Hits taken in the last [30] seconds>) + [0.1])  `
+
+    - Due to mechanical limitations Unarmored, unlike Armor skills, does _not_ scale with damage taken.  
+        Instead, you get more XP per hit the least you've been hit within a 30 second window.
+        > This means unarmored is a viable defensive skill for mages and assassins that prefer to avoid damage rather than resist it.  
+        > In vanilla, this kind of gameplay results in such low amounts of experience that, despite unarmored being a magic skill, you can never meaningfully progress without trainers.  
+        > Now it will actually level at a decent rate if you don't get hit very often.  
+        > On the reverse, armor is a better choice if you intend to be hit a lot.  
+    - Armor Weight slows down Unarmored progress.
+        > You can do with mixing some light armor in, such as a shield.  
+        > You should avoid combining unarmored with heavy armor.  
+        > They're opposite sides of a spectrum, and aren't meant to be used together.  
+
+#### Acrobatics
+
+- [x] Acrobatics XP scales with current encumbrance ratio and with long sessions of running.
+
+    `  XP Multiplier = ([1.5] + [0.5 - 1.5] * Encumbrance%) * 2/ (1 + <Jumps in the last [5] seconds>/2)  `
+
+    - You get more XP while light on your feet.
+    - You benefit more from calculated jumps, and less from spam jumping up hills.
+        > These two factors together encourage you to actually _play_ as an agile character if you intend to raise acrobatics.
+
+#### Athletics
+
+- [x] Acrobatics XP scales with current encumbrance ratio and with long sessions of running.
+
+    `  XP Multiplier = ([0.5] + [1.5 - 0.5] * Encumbrance%) * ([0.5] + [2 - 0.5] * <seconds running>/[300])
+
+    - Running for extended periods of time rewards more experience. (<seconds running> caps at 300)
+    - You gain _more_ Athletics XP when heavily encumbered.
+        > These two factors together encourage the use of Athletics for characters that rely on heavy gear, since they will both get more experience from running and run for longer periods of time (due to weight making them run slower). 
+    - You no longer get experience while flying or jumping.
+        > This makes Athletics mutually exclusive with jumping as a means of transportaion.
+    - Your experience rate gets multiplied by [0.01] if you're not meaningfully moving.
+        > This makes running into a wall still _viable_ as an athletics training method, but it's no longer a super free 100.
+
+#### Security
+
+- [x] Security scales with the difficulty of the target lock or trap.
+    
+    `  XP Multiplier = Difficulty/[20]  `
+    
+    - Difficulty is lock level when lockpicking, and trap spell cost while probing.
+    - Opening big locks and disarming dangerous traps rewards large amounts of XP.
+        > Likewise, opening 1pt locks is usually more trouble than it's worth.  
+        > You can still use lock spells to train security, but you're encouraged to use larger lock spells for it.
+
+### TODO: These are in the planning stage, and have not been implemented yet:
+
 #### Enchanting
 
 - Enchanting XP scales with different things for each of it's uses:
@@ -77,58 +136,3 @@
     - Tones down XP from easily gathered/purchased ingredients.
     - More ingredients means more Value, means more XP. As it should.  
         > Now you can make 4 ingredient superpotions and not feel wasteful for doing the objectively cool thing.
-
-## UNTRACKABLE SKILLS
-> All of these skills scale with workaround or compromise variables.  
-> They will get better scaling formulas as soon as Lua API support is added for the missing factors.
-
-#### Melee Weapons and Bows/Crossbows
-
-- [x] Weapon XP scales posi-negatively with Weapon Skill, isn't affected by Weapon Speed, and scales positively with net Damage Dealt (taken from item condition lost)  
-    
-    `  XP Multiplier = Damage/[10] / Weapon Speed * 80 /(40 + Skill)  `
-    
-    - XP per combat enocunter will be mainly determined by _enemy HP_ rather than by how a$$ your weapon's minimal damage is.
-    - Weapon Skill is set as a divider, to stabilise the effect of hit chance on levling.  
-        > This makes high levels not result in uberfast XP.  
-        > Likewise, it also tones down the badness of missing a lot when skill is low.
-    - All weapons level at the same rate regardless of attack speed
-        > Yes, it's dividing in the formula. Don't get scared, all that does is neutralise it.  
-    - Damage is counted before your difficulty settings are applied.
-        > So the effect of difficulty (if any) on weapon leveling is the same as vanilla.
-    - Condition lost only changes every 10 damage for weapons, unless you have changed a specific GMST.  
-        > This makes the formula more a staircase than a line.  
-        > This makes the formula not work when you're dealing less than 20 damage.  
-        > ..a compromise was made and a different formula is used when you deal low damage, which averages weapon stats.
-        - The ***S_U_S_Weapon-XP-Precision*** addon eliminates this issue almost completely.
-
-- The ***S_U_S_Weapon-XP-Precision*** addon doubles weapon degradation speed, and doubles Armorer repair rates.
-    - The addon is completely optional, but highly recommended, especially along [Weaponry of Resdayn Rebalanced](https://www.nexusmods.com/morrowind/mods/51247)
-    - It makes Armorer field repairs more valuable, and increases the need to carry backup weapons.
-    - It MASSIVELY reduces the number of cases where the alternate, compromised backup formula gets used.
-        > It basically goes back to being a "Trackable Skill" if you have it.
-
-#### Throwing
-
-- [ ] Throwing XP scales with marksman level and average item damage.
-
-#### Unarmored
-
-- [x] Unarmored XP scales positively with not getting hit and dodge rating, posi-negatively with unarmored skill, and negatively with armor weight.  
-    Armor weight, dodge rating and not-hit bonus are all configurable.
-    - Due to mechanical limitations Unarmored, unlike Armor skills, does _not_ scale with damage taken.  
-      Instead, you get more XP per hit the least you've been hit within a 60 second window.
-        > This means unarmored is a viable defensive skill for mages and assassins that prefer to avoid damage rather than resist it.  
-        > In vanilla, this kind of gameplay results in such low amounts of experience that you never meaningfully progress without trainers.  
-        > Now it will actually level at a decent rate if you don't get hit very often.  
-        > On the reverse, armor is a better choice if you intend to be hit a lot.
-    - Armor Weight slows down Unarmored progress.
-        > You can do with mixing some light armor in, such as a shield.
-        > You should avoid combining unarmored with heavy armor.
-        > They're opposite sides of a spectrum, and aren't meant to be used together.
-    - Argonians and Khajiit get a significant bonus to XP rates if fully clad in armor.
-        > Well, if clad in 8 pieces or more to be precise. No bonus if more than 3 slots are left unarmored.
-        > This is meant for Helmet, Boots and Shield (for 2 handers with some mods), but it can technically be any 3 slots you want.
-        > The bonus is divided among empty slots, so the overall effect is the same if you have 1, 2 or 3 slots open.
-        > The purpose of this bonus is to somewhat compensate for the inability to equip any boots and most helmets...
-        > ..letting your unarmored skill keep up with your armor skill, so the empty slots have a decent Armor Rating.

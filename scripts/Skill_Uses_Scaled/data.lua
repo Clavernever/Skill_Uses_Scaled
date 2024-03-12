@@ -182,7 +182,7 @@ Dt.STANCE = {
   NOTHING = {[types.Actor.STANCE.Nothing] = true},
 }
 Dt.scalers = {
-  default = {func = function(xp) return xp end},
+  default = {func = function(useType, xp) return xp end},
   new     = function(self, t) end
 }
 -- SCRIPT LOGIC VARIABLES

@@ -16,17 +16,15 @@ for _, _groupname in ipairs(Dt.ATTACK_ANIMATION_GROUPS) do
   i_AnimControl.addTextKeyHandler(_groupname, function(groupname, key) Fn.get_attack(groupname, key) end)
 end
 
+Fn.make_scalers()
+skp.addSkillUsedHandler(function(skillid, options)
+  if Dt.scalers[skillid] then
+    options.skillGain = Dt.scalers[skillid].func(options.useType, options.skillGain)
+  end
+end)
 
 Fn.register_Use_Action_Handler()
 
-onActive = function()
-  Fn.make_scalers()
-  skp.addSkillUsedHandler(function(skillid, useType, options)
-    if Dt.scalers[skillid] then
-      options.skillGain = Dt.scalers[skillid].func(useType, options.skillGain)
-    end
-  end)
-end
 local armor = nil           -- create here instead of every frame
 local equipped_armor_thisframe = {} -- create here instead of every frame
 local onUpdate = function(dt)
@@ -63,7 +61,6 @@ end
 
 return {
   engineHandlers = {
-    onActive = onActive,
     onUpdate = onUpdate,
     onFrame  = onFrame ,
     onInit   = onInit  ,

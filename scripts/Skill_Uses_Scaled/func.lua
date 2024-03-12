@@ -175,16 +175,12 @@ Fn.register_Use_Action_Handler = function()
   local useCallback = async:callback(
     function()
       if input.getBooleanActionValue("Use") then
-        -- If in a menu or not in weapon stance, skip
-        if i_UI.getMode() then return
+        if i_UI.getMode() then return -- We're in a menu
         elseif Dt.STANCE.SPELL[types.Actor.getStance(self)] then
           Dt.pc.spell = types.Actor.getSelectedSpell(self)
         elseif Dt.STANCE.WEAPON[types.Actor.getStance(self)] then
           local weapon = types.Actor.getEquipment(self, Dt.SLOTS.WEAPON)
-          if not weapon then -- H2H
-            -- We request global.lua to request core.lua to update data.lua with the current WerewolfClawMult.
-            -- We do it here cause it needs 2 frames to resolve due to event delay, and this handler happens ~10 frames before the hit (and thus the skill handler).
-            if types.NPC.isWerewolf(self) then core.sendGlobalEvent('SUS_updateGLOBvar', {source = self.obj, id = 'WerewolfClawMult'}) end
+          if not weapon then return -- H2H
           elseif (weapon.type == types.Lockpick) or (weapon.type == types.Probe) then
             Dt.pc.security_target = Fn.get_security_target()
             Dt.securiting = true -- We make onFrame scan continuously in case the player starts without a valid target and moves their cursor to one while holding click down.
@@ -328,12 +324,12 @@ Fn.make_scalers = function()
         local damage = (condition_lost * rating)/(rating - condition_lost)
         -- Armor skill and AR GMSTs are combined to make leveling below base AR faster, and above slower.
         local skill = types.Player.stats.skills[_skillid](self).base
-        local multiplier = damage/Mui.getSetting('Armor_Damage_To_XP') * 2*Dt.GMST.iBaseArmorSkill / (Dt.GMST.iBaseArmorSkill + skill)
+        local multiplier = damage/Mui.getSetting('Armor_Damage_To_XP') * 60 / (30 + skill)
         xp = xp * multiplier
 
         -- Add a hit for Unarmored's timer, so that having a couple empty pieces doesn't result in massive unarmored bonuses.
         Dt.counters.unarmored(1)
-        if Mui.getSetting("SUS_DEBUG") then print('SUS [Armor] Skill Uses: '.. string.format('%.2f', multiplier)..' | Skill Progress: '..percentify(xp)..' | Damage Received: '.. string.format('%.2f', damage)) end
+        if Mui.getSetting("SUS_DEBUG") then print('SUS [Armor] Skill Uses: '.. string.format('%.2f', multiplier)..' | XP '..string.format('%.2f', xp)..' | Damage Received: '.. string.format('%.2f', damage)) end
 
         return xp
       end
@@ -362,10 +358,10 @@ Fn.make_scalers = function()
       -- Armor skill and AR GMSTs are combined to make leveling below base AR faster, and above slower.
       local skill = types.Player.stats.skills.block(self).base
 
-      local multiplier = damage/Mui.getSetting('Block_Damage_To_XP') * (Dt.GMST.iBlockMaxChance+Dt.GMST.iBlockMinChance) / (2*Dt.GMST.iBlockMinChance + skill)
+      local multiplier = damage/Mui.getSetting('Block_Damage_To_XP') * 60 / (30 + skill)
       xp = xp * multiplier
 
-      if Mui.getSetting("SUS_DEBUG") then print('SUS [Block] Skill Uses: '.. string.format('%.2f', multiplier)..' | Skill Progress: '..percentify(xp)..' | Damage Received: '.. string.format('%.2f', damage)) end
+      if Mui.getSetting("SUS_DEBUG") then print('SUS [Block] Skill Uses: '.. string.format('%.2f', multiplier)..' | XP '..string.format('%.2f', xp)..' | Damage Received: '.. string.format('%.2f', damage)) end
 
       -- Note we DON'T add an unarmored hit down here. You fully blocked, took no damage and gained no armor skill xp, so it doesn't count as a hit in my books.
 
@@ -393,7 +389,7 @@ Fn.make_scalers = function()
       local multiplier = skill_factor * beast_factor * gank_factor
       local xp = xp * multiplier
 
-      if Mui.getSetting("SUS_DEBUG") then print('SUS [Unarmored] Skill Uses: '.. string.format('%.2f', multiplier)..' | Skill Progress: '..percentify(xp)..' | Hit Counter: '..string.format('%.2f', Dt.counters.unarmored(0))) end
+      if Mui.getSetting("SUS_DEBUG") then print('SUS [Unarmored] Skill Uses: '.. string.format('%.2f', multiplier)..' | XP '..string.format('%.2f', xp)..' | Hit Counter: '..string.format('%.2f', Dt.counters.unarmored(0))) end
 
       return xp
     end
@@ -417,7 +413,7 @@ Fn.make_scalers = function()
         local multiplier = spell.cost/Mui.getSetting('Magicka_to_XP') * 4.8/(4 + math.max(0, mp_factor - 1))
         xp = xp * multiplier
 
-        if Mui.getSetting("SUS_DEBUG") then print('SUS [Magic] Skill Uses: '.. string.format('%.2f', multiplier)..' | Skill Progress: '..percentify(xp)..' | Spell Cost: '.. string.format('%.2f', spell.cost)) end
+        if Mui.getSetting("SUS_DEBUG") then print('SUS [Magic] Skill Uses: '.. string.format('%.2f', multiplier)..' | XP '..string.format('%.2f', xp)..' | Spell Cost: '.. string.format('%.2f', spell.cost)) end
 
         if not Mui.getSetting('toggle_refund') then return xp end
 
@@ -456,7 +452,7 @@ Fn.make_scalers = function()
         local skill = types.Player.stats.skills[_skillid](self).base
         local multiplier = Dt.pc.attack.damage/Mui.getSetting('Physical_Damage_to_XP') * 80/(40 + skill)
         xp = xp * multiplier
-        if Mui.getSetting("SUS_DEBUG") then print('SUS [Weapon] Skill Uses: '.. string.format('%.2f', multiplier)..' | Skill Progress: '..percentify(xp)..' | Damage Dealt: '.. string.format('%.2f', Dt.pc.attack.damage)..' | Weapon Draw // Attack Charge: '..percentify(Dt.pc.attack.draw)) end
+        if Mui.getSetting("SUS_DEBUG") then print('SUS [Weapon] Skill Uses: '.. string.format('%.2f', multiplier)..' | XP '..string.format('%.2f', xp)..' | Damage Dealt: '.. string.format('%.2f', Dt.pc.attack.damage)..' | Weapon Draw // Attack Charge: '..percentify(Dt.pc.attack.draw)) end
         return xp
       end
     }
@@ -477,7 +473,7 @@ Fn.make_scalers = function()
       local damage = (damage + damage * Dt.GMST.fHandtoHandHealthPer)/2
       local multiplier = damage/Mui.getSetting('Physical_Damage_to_XP') * 80/(40 + skill)
       xp = xp * multiplier
-      if Mui.getSetting("SUS_DEBUG") then print('SUS [Hand-To-Hand] Skill Uses: '.. string.format('%.2f', multiplier)..' | Skill Progress: '..percentify(xp)..' | Damage Dealt: '.. string.format('%.2f', damage)..' | Weapon Draw // Attack Charge: '..percentify(Dt.pc.attack.draw)) end
+      if Mui.getSetting("SUS_DEBUG") then print('SUS [Hand-To-Hand] Skill Uses: '.. string.format('%.2f', multiplier)..' | XP '..string.format('%.2f', xp)..' | Damage Dealt: '.. string.format('%.2f', damage)..' | Weapon Draw // Attack Charge: '..percentify(Dt.pc.attack.draw)) end
       return xp
     end
   }
@@ -496,7 +492,7 @@ Fn.make_scalers = function()
       end
       local multiplier = encumbered_mult * recursive_mult -- No fatigue% => no XP, and more weight% == less XP
       xp = xp * multiplier
-      if Mui.getSetting("SUS_DEBUG") then print('SUS [Acrobatics] Skill Uses: '.. string.format('%.2f', multiplier)..' | Skill Progress: '..percentify(xp)..' | Jump Mult: '.. string.format('%.2f', recursive_mult)) end
+      if Mui.getSetting("SUS_DEBUG") then print('SUS [Acrobatics] Skill Uses: '.. string.format('%.2f', multiplier)..' | XP '..string.format('%.2f', xp)..' | Jump Mult: '.. string.format('%.2f', recursive_mult)) end
       return xp
     end
   }
@@ -523,7 +519,7 @@ Fn.make_scalers = function()
       xp = xp * multiplier
       local printcounter = Dt.counters.athletics_debug(1)
       if printcounter > 5.01 then
-        if Mui.getSetting("SUS_DEBUG") then print('SUS [Athletics] Skill Uses: '.. string.format('%.2f', multiplier)..' | Skill Progress: '..percentify(xp * printcounter)..' | Marathon Mult: '.. string.format('%.2f', recursive_mult)) end
+        if Mui.getSetting("SUS_DEBUG") then print('SUS [Athletics] Skill Uses: '.. string.format('%.2f', multiplier)..' | XP '..string.format('%.2f', xp * printcounter)..' | Marathon Mult: '.. string.format('%.2f', recursive_mult)) end
         Dt.counters.athletics_debug(-printcounter)
       end
       return xp
@@ -552,7 +548,7 @@ Fn.make_scalers = function()
       end
 
       xp = xp * multiplier
-      if Mui.getSetting("SUS_DEBUG") then print('SUS [Security] Skill Uses: '.. string.format('%.2f', multiplier)..' | Skill Progress: '..percentify(xp)..' | '..security_print) end
+      if Mui.getSetting("SUS_DEBUG") then print('SUS [Security] Skill Uses: '.. string.format('%.2f', multiplier)..' | XP '..string.format('%.2f', xp)..' | '..security_print) end
       return xp
     end
   }

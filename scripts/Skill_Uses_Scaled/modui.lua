@@ -38,8 +38,7 @@ end
 local Mui = {}
 
 Mui.presets = {
-	custom = {},
-	default = {
+	custom = {}, default = {
     Magicka_to_XP              = 9     ,
     MP_Refund_Skill_Offset     = 15    ,
     MP_Refund_Armor_mult       = 0.5   ,
@@ -53,6 +52,7 @@ Mui.presets = {
     mysticism       = true             ,
     restoration     = true             ,
     Physical_Damage_to_XP      = 15    ,
+    toggle_h2h_str             = true  ,
     HandToHand_Strength        = 40    ,
     toggle_physical            = true  ,
     axe             = true             ,
@@ -179,6 +179,9 @@ settings.registerGroup {
 }
 
 addSettingsGroup('physical')
+Mui.Settings_SUS_physical.args = {
+  HandToHand_Strength = {l10n = 'Skill_Uses_Scaled', items = array_concat(num_range(10, 100, 5)), disabled = false},
+}
 settings.registerGroup {
   key              = 'Settings_SUS_physical',
   name             = 'Weapons and Hand To Hand',
@@ -196,11 +199,16 @@ settings.registerGroup {
       argument    = {l10n = 'Skill_Uses_Scaled',items = array_concat(num_range(1,25,1), num_range(30, 100, 5))},
       default     = Mui.presets.default.Physical_Damage_to_XP,
     },{
-      key         = 'HandToHand_Strength',
+      key         = 'toggle_h2h_str',
       name        = 'Factor Strength into Hand to Hand',
-      description = 'H2H damage is multiplied by [STR]/[This] when calculating XP.\n Default is same as OpenMW\'s.\n Set to 1 to disable.\n Does not affect Werewolves, since (due to how the game works) you don\'t get XP from attacking while in Werewolf form.',
+      renderer    = 'checkbox',
+      default     = Mui.presets.default.toggle_h2h_str,
+    },{
+      key         = 'HandToHand_Strength',
+      name        = 'H2H Strength Ratio',
+      description = 'H2H damage is multiplied by [STR]/[This] when calculating XP.\n Default is same as OpenMW\'s.\n Does not affect Werewolves, since (due to how the game works) you don\'t get XP from attacking while in Werewolf form.',
       renderer    = 'select',
-      argument    = {l10n = 'Skill_Uses_Scaled', items = array_concat(num_range(1,9,1), num_range(10, 100, 5))},
+      argument    = {l10n = 'Skill_Uses_Scaled', items = array_concat(num_range(10, 100, 5))},
       default     = Mui.presets.default.HandToHand_Strength,
     }, 
     {key = 'toggle_physical', name = 'Enable XP Scaling for this Skill Group:', renderer = 'checkbox', default = Mui.presets.default.toggle_physical}, 
@@ -475,7 +483,8 @@ settings.registerGroup {
 }
 
 Mui.custom_groups = {
-	toggle_refund = true,
+	toggle_refund  = true,
+	toggle_h2h_str = true,
 }
 Mui.custom = function(group, key)
   if key == 'toggle_refund' then
@@ -491,6 +500,14 @@ Mui.custom = function(group, key)
       settings.updateRendererArgument(group, offset, edit_args(args[offset], {disabled = true}))
       settings.updateRendererArgument(group, mult  , edit_args(args[mult  ], {disabled = true}))
       settings.updateRendererArgument(group, max   , edit_args(args[max   ], {disabled = true}))
+    end
+	elseif key == 'toggle_h2h_str' then
+    local args   = Mui.Settings_SUS_physical.args
+		local ratio  = 'HandToHand_Strength'
+    if Mui[group].section:get(key) then
+      settings.updateRendererArgument(group, ratio, edit_args(args[ratio], {disabled = false}))
+    else
+      settings.updateRendererArgument(group, ratio, edit_args(args[ratio], {disabled = true}))
     end
   end
 end
