@@ -75,6 +75,11 @@ Dt.ATTACK_ANIMATION_KEYS = {
     ['shoot release'    ] = 'chop',
   },
 }
+Dt.SPELL_ANIMATION_KEYS = {
+	['target start'] = true,
+	['touch start' ] = true,
+	['self start'  ] = true,
+}
 Dt.WEAPON_TYPES = {
   MELEE = {
     [types.Weapon.TYPE.AxeOneHand       ] = 'axe'        ,

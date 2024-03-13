@@ -90,7 +90,7 @@ Mui.presets = {
     Security_Lock_Points_To_XP = 20    ,
     Security_Trap_Points_To_XP = 20    ,
     security        = true             ,
-    SUS_DEBUG                  = true ,
+    SUS_DEBUG                  = false ,
   --SUS_VERBOSE                = false ,
 	}
 }

@@ -9,12 +9,11 @@ local Dt  = require('scripts.Skill_Uses_Scaled.data')
 local Fn  = require('scripts.Skill_Uses_Scaled.func')
 local Mui = require('scripts.Skill_Uses_Scaled.modui')
 
-function get_keytime(key) return anim.getTextKeyTime(self, key) - (anim.getTextKeyTime(self, 'chop min attack'))/(anim.getTextKeyTime(self, 'chop max attack') - anim.getTextKeyTime(self, 'chop min attack')) end
-
 for _, _groupname in ipairs(Dt.ATTACK_ANIMATION_GROUPS) do
---   i_AnimControl.addTextKeyHandler(_groupname, function(groupname, key) print('Completion: '..string.format('%.2f', anim.getTextKeyTime(self, 'hit'))..' | Key: '..key) end)
+--i_AnimControl.addTextKeyHandler(_groupname, function(groupname, key) print('Completion: '..string.format('%.2f', anim.getTextKeyTime(self, 'hit'))..' | Key: '..key) end)
   i_AnimControl.addTextKeyHandler(_groupname, function(groupname, key) Fn.get_attack(groupname, key) end)
 end
+i_AnimControl.addTextKeyHandler('spellcast', function(groupname, key) Fn.get_spell(groupname, key) end)
 
 Fn.make_scalers()
 skp.addSkillUsedHandler(function(skillid, options)

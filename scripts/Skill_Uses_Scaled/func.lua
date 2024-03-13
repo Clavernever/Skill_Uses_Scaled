@@ -171,13 +171,18 @@ Fn.set_hit_release = function()
 end
 Fn.set_hit_release_callback = async:registerTimerCallback('set_hit_release_callback', function() if not input.getBooleanActionValue("Use") then Fn.set_hit_release() end end)
 
+function Fn.get_spell(groupname, key)
+	if Dt.SPELL_ANIMATION_KEYS[key] then 
+		local spell = types.Actor.getSelectedSpell(self)
+    if spell then Dt.pc.spell = types.Actor.getSelectedSpell(self) end
+	end
+end
+
 Fn.register_Use_Action_Handler = function()
   local useCallback = async:callback(
     function()
       if input.getBooleanActionValue("Use") then
         if i_UI.getMode() then return -- We're in a menu
-        elseif Dt.STANCE.SPELL[types.Actor.getStance(self)] then
-          Dt.pc.spell = types.Actor.getSelectedSpell(self)
         elseif Dt.STANCE.WEAPON[types.Actor.getStance(self)] then
           local weapon = types.Actor.getEquipment(self, Dt.SLOTS.WEAPON)
           if not weapon then return -- H2H
@@ -188,7 +193,7 @@ Fn.register_Use_Action_Handler = function()
         end
       else
         if not Dt.STANCE.WEAPON[types.Actor.getStance(self)] then return end
-        local weapon = types.Actor.getEquipment(self, Dt.SLOTS.WEAPON)
+          local weapon = types.Actor.getEquipment(self, Dt.SLOTS.WEAPON)
         if not weapon or (weapon.type == types.Weapon) then -- H2H
           if not i_UI.getMode() then Fn.set_hit_release() end
         elseif (weapon.type == types.Lockpick) or (weapon.type == types.Probe) then -- Security
@@ -408,7 +413,7 @@ Fn.make_scalers = function()
           if Mui.getSetting("SUS_DEBUG") then print('SUS - Held Spell not found, returning vanilla XP') end
           return xp
 				elseif (not spell.cost) or (spell.cost == 0) then
-					if Mui.getSetting("SUS_DEBUG") then print('SUS - Held Spell\'s cost ('..spell.cost..') is not valid, returning vanilla XP') end
+					if Mui.getSetting("SUS_DEBUG") then print('SUS - Held Spell\'s cost ('..tostring(spell.cost)..') is not valid, returning vanilla XP') end
 					return xp
         end
         local max_mp = types.Player.stats.dynamic.magicka(self).base
