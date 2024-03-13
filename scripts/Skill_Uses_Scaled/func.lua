@@ -407,9 +407,12 @@ Fn.make_scalers = function()
         if not spell then 
           if Mui.getSetting("SUS_DEBUG") then print('SUS - Held Spell not found, returning vanilla XP') end
           return xp
+				elseif (not spell.cost) or (spell.cost == 0) then
+					if Mui.getSetting("SUS_DEBUG") then print('SUS - Held Spell\'s cost ('..spell.cost..') is not valid, returning vanilla XP') end
+					return xp
         end
-        local max_mp   = types.Player.stats.dynamic.magicka(self).base
-        local mp_factor  = 0.01*max_mp
+        local max_mp = types.Player.stats.dynamic.magicka(self).base
+        local mp_factor = 0.01*max_mp
         local multiplier = spell.cost/Mui.getSetting('Magicka_to_XP') * 4.8/(4 + math.max(0, mp_factor - 1))
         xp = xp * multiplier
 
@@ -418,11 +421,11 @@ Fn.make_scalers = function()
         if not Mui.getSetting('toggle_refund') then return xp end
 
         local armor_weight = 0
-        local armor    = Fn.get_equipped_armor()
+        local armor = Fn.get_equipped_armor()
         for _, _obj in ipairs(armor) do armor_weight = armor_weight + types.Armor.record(_obj).weight end
         local armor_offset = armor_weight * Mui.getSetting('MP_Refund_Armor_mult')
         local cost_factor  = max_mp / (max_mp + spell.cost)
-        local skill    = types.Player.stats.skills[_skillid](self).base
+        local skill = types.Player.stats.skills[_skillid](self).base
         local skill_factor = (skill - Mui.getSetting('MP_Refund_Skill_Offset') - armor_offset) / (40 + skill)
 
         local refund = spell.cost * cost_factor * skill_factor * 0.01*Mui.getSetting('MP_Refund_Max_Percent')

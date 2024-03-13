@@ -90,7 +90,7 @@ Mui.presets = {
     Security_Lock_Points_To_XP = 20    ,
     Security_Trap_Points_To_XP = 20    ,
     security        = true             ,
-    SUS_DEBUG                  = false ,
+    SUS_DEBUG                  = true ,
   --SUS_VERBOSE                = false ,
 	}
 }
@@ -555,6 +555,7 @@ Mui.savePreset = function(name)
 		end
   end
   storage.playerSection("SUS_Presets"):set(name, preset)
+  storage.playerSection("SUS_Presets"):setLifeTime(storage.LIFE_TIME.Persistent)
 end
 Mui.loadPreset = function(name)
 	local target_as_table = storage.playerSection("SUS_Presets"):asTable()[name]
@@ -563,6 +564,7 @@ Mui.loadPreset = function(name)
   	for k, v in pairs (Mui[groupid].section:asTable()) do
 			if target_as_table[k] ~= nil then
         Mui[groupid].section:set(k, target_as_table[k])
+				print('SUS - Loading preset ['..name..'] | '..k..' -> '..tostring(target_as_table[k]))
 		  end
   	end
   end

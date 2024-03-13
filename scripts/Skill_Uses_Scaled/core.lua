@@ -50,7 +50,7 @@ local onFrame = function(dt)
 end
 
 local onInit = function()
-	Mui.savePreset('current')
+	Mui.loadPreset('current')
 end
 local onSave = function()
 	Mui.savePreset('current')
